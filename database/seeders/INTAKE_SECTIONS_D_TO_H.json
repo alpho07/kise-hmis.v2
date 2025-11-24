@@ -1,0 +1,928 @@
+{
+  "comment": "This is the continuation of the Intake Assessment schema - Sections D through H",
+  "sections": [
+    {
+      "id": "sociodemographic",
+      "title": "Socio-Demographic Information",
+      "description": "Living situation, education, and family context",
+      "icon": "heroicon-o-users",
+      "order": 4,
+      "collapsible": true,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "marital_status",
+          "type": "select",
+          "label": "Marital Status",
+          "options": [
+            {"value": "single", "label": "Single"},
+            {"value": "married", "label": "Married"},
+            {"value": "divorced", "label": "Divorced"},
+            {"value": "widowed", "label": "Widowed"},
+            {"value": "separated", "label": "Separated"}
+          ],
+          "conditionalDisplay": {
+            "ageCondition": {"min": 18}
+          }
+        },
+        {
+          "id": "living_arrangement",
+          "type": "select",
+          "label": "Living Arrangement",
+          "options": [
+            {"value": "parents", "label": "With parents"},
+            {"value": "spouse", "label": "With spouse/partner"},
+            {"value": "alone", "label": "Alone"},
+            {"value": "relatives", "label": "With relatives"},
+            {"value": "institution", "label": "Institution"},
+            {"value": "other", "label": "Other"}
+          ],
+          "validation": {"required": true}
+        },
+        {
+          "id": "primary_caregiver",
+          "type": "text",
+          "label": "Primary Caregiver",
+          "placeholder": "Name of primary caregiver",
+          "conditionalDisplay": {
+            "ageCondition": {"max": 18}
+          }
+        },
+        {
+          "id": "caregiver_phone",
+          "type": "text",
+          "inputType": "tel",
+          "label": "Caregiver Phone",
+          "placeholder": "0712345678",
+          "conditionalDisplay": {
+            "ageCondition": {"max": 18}
+          }
+        },
+        {
+          "id": "household_size",
+          "type": "text",
+          "inputType": "number",
+          "label": "Household Size",
+          "placeholder": "Number of people",
+          "helperText": "Total people living in household"
+        },
+        {
+          "id": "primary_language",
+          "type": "select",
+          "label": "Primary Language",
+          "options": [
+            {"value": "english", "label": "English"},
+            {"value": "kiswahili", "label": "Kiswahili"},
+            {"value": "kikuyu", "label": "Kikuyu"},
+            {"value": "luo", "label": "Luo"},
+            {"value": "luhya", "label": "Luhya"},
+            {"value": "kamba", "label": "Kamba"},
+            {"value": "kalenjin", "label": "Kalenjin"},
+            {"value": "ksl", "label": "Kenya Sign Language"},
+            {"value": "other", "label": "Other"}
+          ],
+          "validation": {"required": true}
+        },
+        {
+          "id": "communication_method",
+          "type": "select",
+          "label": "Communication Method",
+          "options": [
+            {"value": "verbal", "label": "Verbal"},
+            {"value": "sign_language", "label": "Sign Language"},
+            {"value": "gestures", "label": "Gestures"},
+            {"value": "picture_cards", "label": "Picture Cards"},
+            {"value": "aac_device", "label": "AAC Device"},
+            {"value": "writing", "label": "Writing"},
+            {"value": "other", "label": "Other"}
+          ]
+        },
+        {
+          "id": "interpreter_needed",
+          "type": "toggle",
+          "label": "Interpreter Needed?",
+          "helperText": "Check if client needs interpreter for services"
+        },
+        {
+          "id": "economic_status",
+          "type": "select",
+          "label": "Economic Status (Caregiver View)",
+          "options": [
+            {"value": "above_average", "label": "Above Average"},
+            {"value": "average", "label": "Average"},
+            {"value": "below_average", "label": "Below Average"},
+            {"value": "low_income", "label": "Low Income"}
+          ],
+          "helperText": "Self-reported economic status"
+        },
+        {
+          "id": "main_income_source",
+          "type": "select",
+          "label": "Main Income Source",
+          "options": [
+            {"value": "employment", "label": "Employment"},
+            {"value": "business", "label": "Business"},
+            {"value": "farming", "label": "Farming"},
+            {"value": "support_family", "label": "Family Support"},
+            {"value": "support_government", "label": "Government Support"},
+            {"value": "pension", "label": "Pension"},
+            {"value": "none", "label": "None"},
+            {"value": "other", "label": "Other"}
+          ]
+        },
+        {
+          "id": "health_insurance",
+          "type": "checkbox_list",
+          "label": "Health Insurance Coverage",
+          "options": [
+            {"value": "sha", "label": "SHA (Social Health Authority)"},
+            {"value": "ncpwd", "label": "NCPWD"},
+            {"value": "private", "label": "Private Insurance"},
+            {"value": "employer", "label": "Employer-based"},
+            {"value": "none", "label": "None"}
+          ],
+          "columns": 2,
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "medical_history",
+      "title": "Medical & Developmental History",
+      "description": "Medical conditions, medications, and developmental milestones",
+      "icon": "heroicon-o-heart",
+      "order": 5,
+      "collapsible": true,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "chronic_conditions",
+          "type": "checkbox_list",
+          "label": "Chronic Conditions (Select all that apply)",
+          "options": [
+            {"value": "epilepsy", "label": "Epilepsy"},
+            {"value": "cerebral_palsy", "label": "Cerebral Palsy"},
+            {"value": "autism", "label": "Autism Spectrum Disorder"},
+            {"value": "down_syndrome", "label": "Down Syndrome"},
+            {"value": "adhd", "label": "ADHD"},
+            {"value": "diabetes", "label": "Diabetes"},
+            {"value": "asthma", "label": "Asthma"},
+            {"value": "heart_condition", "label": "Heart Condition"},
+            {"value": "mental_health", "label": "Mental Health Condition"},
+            {"value": "none", "label": "None Known"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true
+        },
+        {
+          "id": "chronic_conditions_other",
+          "type": "text",
+          "label": "Other Conditions",
+          "placeholder": "Specify",
+          "conditionalDisplay": {
+            "field": "chronic_conditions",
+            "operator": "contains",
+            "value": "other"
+          },
+          "columnSpan": "full"
+        },
+        {
+          "id": "current_medications",
+          "type": "textarea",
+          "label": "Current Medications",
+          "rows": 3,
+          "placeholder": "List medications, dosage, frequency",
+          "helperText": "Include traditional remedies if applicable",
+          "columnSpan": "full"
+        },
+        {
+          "id": "past_surgeries",
+          "type": "textarea",
+          "label": "Past Surgeries / Hospitalizations",
+          "rows": 2,
+          "placeholder": "Brief description and dates",
+          "columnSpan": "full"
+        },
+        {
+          "id": "developmental_concerns",
+          "type": "checkbox_list",
+          "label": "Developmental Concerns (Caregiver Reported)",
+          "options": [
+            {"value": "motor_delay", "label": "Motor Development Delay"},
+            {"value": "speech_delay", "label": "Speech/Language Delay"},
+            {"value": "cognitive_delay", "label": "Cognitive Delay"},
+            {"value": "social_delay", "label": "Social Skills Delay"},
+            {"value": "behavioral", "label": "Behavioral Issues"},
+            {"value": "none", "label": "None"},
+            {"value": "other", "label": "Other"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "helperText": "Quick screening flags only"
+        },
+        {
+          "id": "family_history_disability",
+          "type": "toggle",
+          "label": "Family History of Disability?",
+          "helperText": "Any siblings or parents with disabilities",
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "allergies",
+      "title": "Allergies & Sensitivities",
+      "description": "Comprehensive allergy information (Kenya context)",
+      "icon": "heroicon-o-exclamation-triangle",
+      "order": 6,
+      "collapsible": true,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "allergy_categories",
+          "type": "checkbox_list",
+          "label": "Allergy Categories (Select all that apply)",
+          "options": [
+            {"value": "drug", "label": "Drug / Medication"},
+            {"value": "food", "label": "Food"},
+            {"value": "environmental", "label": "Environmental"},
+            {"value": "insect", "label": "Insect Bite/Sting"},
+            {"value": "latex", "label": "Latex"},
+            {"value": "herbal", "label": "Herbal / Traditional Remedy"},
+            {"value": "chemical", "label": "Chemical / Pool Substance"},
+            {"value": "none_known", "label": "None Known"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true
+        },
+        {
+          "id": "specific_allergens_drug",
+          "type": "checkbox_list",
+          "label": "Specific Drug Allergens",
+          "options": [
+            {"value": "penicillin", "label": "Penicillin"},
+            {"value": "amoxicillin", "label": "Amoxicillin"},
+            {"value": "cotrimoxazole", "label": "Cotrimoxazole (Septrin)"},
+            {"value": "artemether", "label": "Artemether-Lumefantrine (AL/Coartem)"},
+            {"value": "ibuprofen", "label": "Ibuprofen"},
+            {"value": "aspirin", "label": "Aspirin"},
+            {"value": "other", "label": "Other"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "contains",
+            "value": "drug"
+          }
+        },
+        {
+          "id": "specific_allergens_food",
+          "type": "checkbox_list",
+          "label": "Specific Food Allergens",
+          "options": [
+            {"value": "milk", "label": "Milk / Dairy"},
+            {"value": "eggs", "label": "Eggs"},
+            {"value": "groundnuts", "label": "Groundnuts (Peanuts)"},
+            {"value": "maize", "label": "Maize"},
+            {"value": "wheat", "label": "Wheat"},
+            {"value": "fish", "label": "Fish"},
+            {"value": "other", "label": "Other"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "contains",
+            "value": "food"
+          }
+        },
+        {
+          "id": "reaction_severity",
+          "type": "select",
+          "label": "Reaction Severity",
+          "options": [
+            {"value": "mild", "label": "Mild (rash, itching)"},
+            {"value": "moderate", "label": "Moderate (swelling, difficulty breathing)"},
+            {"value": "severe", "label": "Severe"},
+            {"value": "life_threatening", "label": "Life-threatening (Anaphylaxis)"}
+          ],
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "not_contains",
+            "value": "none_known"
+          }
+        },
+        {
+          "id": "allergy_management",
+          "type": "textarea",
+          "label": "Allergy Management Notes",
+          "rows": 2,
+          "placeholder": "EpiPen, medications, avoidance strategies",
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "not_contains",
+            "value": "none_known"
+          },
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "referral_concern",
+      "title": "Referral & Presenting Concern",
+      "description": "How client arrived and main reason for visit",
+      "icon": "heroicon-o-arrow-right-circle",
+      "order": 7,
+      "collapsible": false,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "referral_source",
+          "type": "checkbox_list",
+          "label": "Referral Source (Select all that apply)",
+          "options": [
+            {"value": "self", "label": "Self"},
+            {"value": "school", "label": "School"},
+            {"value": "hospital", "label": "Hospital"},
+            {"value": "community_worker", "label": "Community Worker"},
+            {"value": "social_media", "label": "Social Media"},
+            {"value": "court", "label": "Court"},
+            {"value": "ngo", "label": "NGO/CBO"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true
+        },
+        {
+          "id": "referral_source_other",
+          "type": "text",
+          "label": "Other Referral Source",
+          "placeholder": "Specify",
+          "conditionalDisplay": {
+            "field": "referral_source",
+            "operator": "contains",
+            "value": "other"
+          }
+        },
+        {
+          "id": "reason_for_visit",
+          "type": "textarea",
+          "label": "Reason for Visit (One-liner)",
+          "rows": 2,
+          "maxLength": 250,
+          "placeholder": "Brief, concise reason - avoid narratives",
+          "helperText": "Limit 250 characters to prevent narratives",
+          "validation": {"required": true},
+          "columnSpan": "full"
+        },
+        {
+          "id": "referral_documents",
+          "type": "file",
+          "label": "Referral Documents",
+          "helperText": "Upload referral letters or reports",
+          "multiple": true,
+          "acceptedFileTypes": ["application/pdf", "image/*"],
+          "directory": "referral-documents",
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "service_screening",
+      "title": "Service Screening & Posting",
+      "description": "Select services needed and assign primary service point",
+      "icon": "heroicon-o-building-office-2",
+      "order": 8,
+      "collapsible": false,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "service_categories",
+          "type": "checkbox_list",
+          "label": "Service Categories (Select all that apply)",
+          "options": [
+            {"value": "educational_assessment", "label": "Educational Assessment"},
+            {"value": "psychological_assessment", "label": "Psychological Assessment"},
+            {"value": "audiology", "label": "Audiology"},
+            {"value": "physiotherapy", "label": "Physiotherapy"},
+            {"value": "occupational_therapy", "label": "Occupational Therapy"},
+            {"value": "speech_language", "label": "Speech & Language Therapy"},
+            {"value": "vision", "label": "Vision Services"},
+            {"value": "counselling", "label": "Counselling"},
+            {"value": "assistive_technology", "label": "Assistive Technology"},
+            {"value": "nutrition", "label": "Nutrition"},
+            {"value": "social_work", "label": "Social Work"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true,
+          "validation": {"required": true}
+        },
+        {
+          "id": "primary_service_posting",
+          "type": "select",
+          "label": "Primary Service Posting",
+          "dataSource": {
+            "model": "Service",
+            "valueField": "name",
+            "labelField": "name"
+          },
+          "searchable": true,
+          "prefixIcon": "heroicon-o-star",
+          "helperText": "Main service point for this client",
+          "validation": {"required": true}
+        },
+        {
+          "id": "handover_note",
+          "type": "textarea",
+          "label": "Handover Note to Service Point",
+          "rows": 2,
+          "maxLength": 200,
+          "placeholder": "1-2 lines max - key cues only",
+          "helperText": "Brief handover note (max 200 characters)",
+          "columnSpan": "full"
+        },
+        {
+          "id": "booking_requested",
+          "type": "toggle",
+          "label": "Send to Booking Queue",
+          "helperText": "Creates booking request for Customer Care",
+          "columnSpan": "full"
+        }
+      ]
+    }
+  ]
+}
+EOF
+cat /mnt/user-data/outputs/dynamic_forms/seeders/INTAKE_SECTIONS_D_TO_H.json
+
+Output
+{
+  "comment": "This is the continuation of the Intake Assessment schema - Sections D through H",
+  "sections": [
+    {
+      "id": "sociodemographic",
+      "title": "Socio-Demographic Information",
+      "description": "Living situation, education, and family context",
+      "icon": "heroicon-o-users",
+      "order": 4,
+      "collapsible": true,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "marital_status",
+          "type": "select",
+          "label": "Marital Status",
+          "options": [
+            {"value": "single", "label": "Single"},
+            {"value": "married", "label": "Married"},
+            {"value": "divorced", "label": "Divorced"},
+            {"value": "widowed", "label": "Widowed"},
+            {"value": "separated", "label": "Separated"}
+          ],
+          "conditionalDisplay": {
+            "ageCondition": {"min": 18}
+          }
+        },
+        {
+          "id": "living_arrangement",
+          "type": "select",
+          "label": "Living Arrangement",
+          "options": [
+            {"value": "parents", "label": "With parents"},
+            {"value": "spouse", "label": "With spouse/partner"},
+            {"value": "alone", "label": "Alone"},
+            {"value": "relatives", "label": "With relatives"},
+            {"value": "institution", "label": "Institution"},
+            {"value": "other", "label": "Other"}
+          ],
+          "validation": {"required": true}
+        },
+        {
+          "id": "primary_caregiver",
+          "type": "text",
+          "label": "Primary Caregiver",
+          "placeholder": "Name of primary caregiver",
+          "conditionalDisplay": {
+            "ageCondition": {"max": 18}
+          }
+        },
+        {
+          "id": "caregiver_phone",
+          "type": "text",
+          "inputType": "tel",
+          "label": "Caregiver Phone",
+          "placeholder": "0712345678",
+          "conditionalDisplay": {
+            "ageCondition": {"max": 18}
+          }
+        },
+        {
+          "id": "household_size",
+          "type": "text",
+          "inputType": "number",
+          "label": "Household Size",
+          "placeholder": "Number of people",
+          "helperText": "Total people living in household"
+        },
+        {
+          "id": "primary_language",
+          "type": "select",
+          "label": "Primary Language",
+          "options": [
+            {"value": "english", "label": "English"},
+            {"value": "kiswahili", "label": "Kiswahili"},
+            {"value": "kikuyu", "label": "Kikuyu"},
+            {"value": "luo", "label": "Luo"},
+            {"value": "luhya", "label": "Luhya"},
+            {"value": "kamba", "label": "Kamba"},
+            {"value": "kalenjin", "label": "Kalenjin"},
+            {"value": "ksl", "label": "Kenya Sign Language"},
+            {"value": "other", "label": "Other"}
+          ],
+          "validation": {"required": true}
+        },
+        {
+          "id": "communication_method",
+          "type": "select",
+          "label": "Communication Method",
+          "options": [
+            {"value": "verbal", "label": "Verbal"},
+            {"value": "sign_language", "label": "Sign Language"},
+            {"value": "gestures", "label": "Gestures"},
+            {"value": "picture_cards", "label": "Picture Cards"},
+            {"value": "aac_device", "label": "AAC Device"},
+            {"value": "writing", "label": "Writing"},
+            {"value": "other", "label": "Other"}
+          ]
+        },
+        {
+          "id": "interpreter_needed",
+          "type": "toggle",
+          "label": "Interpreter Needed?",
+          "helperText": "Check if client needs interpreter for services"
+        },
+        {
+          "id": "economic_status",
+          "type": "select",
+          "label": "Economic Status (Caregiver View)",
+          "options": [
+            {"value": "above_average", "label": "Above Average"},
+            {"value": "average", "label": "Average"},
+            {"value": "below_average", "label": "Below Average"},
+            {"value": "low_income", "label": "Low Income"}
+          ],
+          "helperText": "Self-reported economic status"
+        },
+        {
+          "id": "main_income_source",
+          "type": "select",
+          "label": "Main Income Source",
+          "options": [
+            {"value": "employment", "label": "Employment"},
+            {"value": "business", "label": "Business"},
+            {"value": "farming", "label": "Farming"},
+            {"value": "support_family", "label": "Family Support"},
+            {"value": "support_government", "label": "Government Support"},
+            {"value": "pension", "label": "Pension"},
+            {"value": "none", "label": "None"},
+            {"value": "other", "label": "Other"}
+          ]
+        },
+        {
+          "id": "health_insurance",
+          "type": "checkbox_list",
+          "label": "Health Insurance Coverage",
+          "options": [
+            {"value": "sha", "label": "SHA (Social Health Authority)"},
+            {"value": "ncpwd", "label": "NCPWD"},
+            {"value": "private", "label": "Private Insurance"},
+            {"value": "employer", "label": "Employer-based"},
+            {"value": "none", "label": "None"}
+          ],
+          "columns": 2,
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "medical_history",
+      "title": "Medical & Developmental History",
+      "description": "Medical conditions, medications, and developmental milestones",
+      "icon": "heroicon-o-heart",
+      "order": 5,
+      "collapsible": true,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "chronic_conditions",
+          "type": "checkbox_list",
+          "label": "Chronic Conditions (Select all that apply)",
+          "options": [
+            {"value": "epilepsy", "label": "Epilepsy"},
+            {"value": "cerebral_palsy", "label": "Cerebral Palsy"},
+            {"value": "autism", "label": "Autism Spectrum Disorder"},
+            {"value": "down_syndrome", "label": "Down Syndrome"},
+            {"value": "adhd", "label": "ADHD"},
+            {"value": "diabetes", "label": "Diabetes"},
+            {"value": "asthma", "label": "Asthma"},
+            {"value": "heart_condition", "label": "Heart Condition"},
+            {"value": "mental_health", "label": "Mental Health Condition"},
+            {"value": "none", "label": "None Known"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true
+        },
+        {
+          "id": "chronic_conditions_other",
+          "type": "text",
+          "label": "Other Conditions",
+          "placeholder": "Specify",
+          "conditionalDisplay": {
+            "field": "chronic_conditions",
+            "operator": "contains",
+            "value": "other"
+          },
+          "columnSpan": "full"
+        },
+        {
+          "id": "current_medications",
+          "type": "textarea",
+          "label": "Current Medications",
+          "rows": 3,
+          "placeholder": "List medications, dosage, frequency",
+          "helperText": "Include traditional remedies if applicable",
+          "columnSpan": "full"
+        },
+        {
+          "id": "past_surgeries",
+          "type": "textarea",
+          "label": "Past Surgeries / Hospitalizations",
+          "rows": 2,
+          "placeholder": "Brief description and dates",
+          "columnSpan": "full"
+        },
+        {
+          "id": "developmental_concerns",
+          "type": "checkbox_list",
+          "label": "Developmental Concerns (Caregiver Reported)",
+          "options": [
+            {"value": "motor_delay", "label": "Motor Development Delay"},
+            {"value": "speech_delay", "label": "Speech/Language Delay"},
+            {"value": "cognitive_delay", "label": "Cognitive Delay"},
+            {"value": "social_delay", "label": "Social Skills Delay"},
+            {"value": "behavioral", "label": "Behavioral Issues"},
+            {"value": "none", "label": "None"},
+            {"value": "other", "label": "Other"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "helperText": "Quick screening flags only"
+        },
+        {
+          "id": "family_history_disability",
+          "type": "toggle",
+          "label": "Family History of Disability?",
+          "helperText": "Any siblings or parents with disabilities",
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "allergies",
+      "title": "Allergies & Sensitivities",
+      "description": "Comprehensive allergy information (Kenya context)",
+      "icon": "heroicon-o-exclamation-triangle",
+      "order": 6,
+      "collapsible": true,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "allergy_categories",
+          "type": "checkbox_list",
+          "label": "Allergy Categories (Select all that apply)",
+          "options": [
+            {"value": "drug", "label": "Drug / Medication"},
+            {"value": "food", "label": "Food"},
+            {"value": "environmental", "label": "Environmental"},
+            {"value": "insect", "label": "Insect Bite/Sting"},
+            {"value": "latex", "label": "Latex"},
+            {"value": "herbal", "label": "Herbal / Traditional Remedy"},
+            {"value": "chemical", "label": "Chemical / Pool Substance"},
+            {"value": "none_known", "label": "None Known"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true
+        },
+        {
+          "id": "specific_allergens_drug",
+          "type": "checkbox_list",
+          "label": "Specific Drug Allergens",
+          "options": [
+            {"value": "penicillin", "label": "Penicillin"},
+            {"value": "amoxicillin", "label": "Amoxicillin"},
+            {"value": "cotrimoxazole", "label": "Cotrimoxazole (Septrin)"},
+            {"value": "artemether", "label": "Artemether-Lumefantrine (AL/Coartem)"},
+            {"value": "ibuprofen", "label": "Ibuprofen"},
+            {"value": "aspirin", "label": "Aspirin"},
+            {"value": "other", "label": "Other"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "contains",
+            "value": "drug"
+          }
+        },
+        {
+          "id": "specific_allergens_food",
+          "type": "checkbox_list",
+          "label": "Specific Food Allergens",
+          "options": [
+            {"value": "milk", "label": "Milk / Dairy"},
+            {"value": "eggs", "label": "Eggs"},
+            {"value": "groundnuts", "label": "Groundnuts (Peanuts)"},
+            {"value": "maize", "label": "Maize"},
+            {"value": "wheat", "label": "Wheat"},
+            {"value": "fish", "label": "Fish"},
+            {"value": "other", "label": "Other"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "contains",
+            "value": "food"
+          }
+        },
+        {
+          "id": "reaction_severity",
+          "type": "select",
+          "label": "Reaction Severity",
+          "options": [
+            {"value": "mild", "label": "Mild (rash, itching)"},
+            {"value": "moderate", "label": "Moderate (swelling, difficulty breathing)"},
+            {"value": "severe", "label": "Severe"},
+            {"value": "life_threatening", "label": "Life-threatening (Anaphylaxis)"}
+          ],
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "not_contains",
+            "value": "none_known"
+          }
+        },
+        {
+          "id": "allergy_management",
+          "type": "textarea",
+          "label": "Allergy Management Notes",
+          "rows": 2,
+          "placeholder": "EpiPen, medications, avoidance strategies",
+          "conditionalDisplay": {
+            "field": "allergy_categories",
+            "operator": "not_contains",
+            "value": "none_known"
+          },
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "referral_concern",
+      "title": "Referral & Presenting Concern",
+      "description": "How client arrived and main reason for visit",
+      "icon": "heroicon-o-arrow-right-circle",
+      "order": 7,
+      "collapsible": false,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "referral_source",
+          "type": "checkbox_list",
+          "label": "Referral Source (Select all that apply)",
+          "options": [
+            {"value": "self", "label": "Self"},
+            {"value": "school", "label": "School"},
+            {"value": "hospital", "label": "Hospital"},
+            {"value": "community_worker", "label": "Community Worker"},
+            {"value": "social_media", "label": "Social Media"},
+            {"value": "court", "label": "Court"},
+            {"value": "ngo", "label": "NGO/CBO"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true
+        },
+        {
+          "id": "referral_source_other",
+          "type": "text",
+          "label": "Other Referral Source",
+          "placeholder": "Specify",
+          "conditionalDisplay": {
+            "field": "referral_source",
+            "operator": "contains",
+            "value": "other"
+          }
+        },
+        {
+          "id": "reason_for_visit",
+          "type": "textarea",
+          "label": "Reason for Visit (One-liner)",
+          "rows": 2,
+          "maxLength": 250,
+          "placeholder": "Brief, concise reason - avoid narratives",
+          "helperText": "Limit 250 characters to prevent narratives",
+          "validation": {"required": true},
+          "columnSpan": "full"
+        },
+        {
+          "id": "referral_documents",
+          "type": "file",
+          "label": "Referral Documents",
+          "helperText": "Upload referral letters or reports",
+          "multiple": true,
+          "acceptedFileTypes": ["application/pdf", "image/*"],
+          "directory": "referral-documents",
+          "columnSpan": "full"
+        }
+      ]
+    },
+    {
+      "id": "service_screening",
+      "title": "Service Screening & Posting",
+      "description": "Select services needed and assign primary service point",
+      "icon": "heroicon-o-building-office-2",
+      "order": 8,
+      "collapsible": false,
+      "columns": 2,
+      "fields": [
+        {
+          "id": "service_categories",
+          "type": "checkbox_list",
+          "label": "Service Categories (Select all that apply)",
+          "options": [
+            {"value": "educational_assessment", "label": "Educational Assessment"},
+            {"value": "psychological_assessment", "label": "Psychological Assessment"},
+            {"value": "audiology", "label": "Audiology"},
+            {"value": "physiotherapy", "label": "Physiotherapy"},
+            {"value": "occupational_therapy", "label": "Occupational Therapy"},
+            {"value": "speech_language", "label": "Speech & Language Therapy"},
+            {"value": "vision", "label": "Vision Services"},
+            {"value": "counselling", "label": "Counselling"},
+            {"value": "assistive_technology", "label": "Assistive Technology"},
+            {"value": "nutrition", "label": "Nutrition"},
+            {"value": "social_work", "label": "Social Work"},
+            {"value": "other", "label": "Other (specify)"}
+          ],
+          "columns": 3,
+          "columnSpan": "full",
+          "live": true,
+          "validation": {"required": true}
+        },
+        {
+          "id": "primary_service_posting",
+          "type": "select",
+          "label": "Primary Service Posting",
+          "dataSource": {
+            "model": "Service",
+            "valueField": "name",
+            "labelField": "name"
+          },
+          "searchable": true,
+          "prefixIcon": "heroicon-o-star",
+          "helperText": "Main service point for this client",
+          "validation": {"required": true}
+        },
+        {
+          "id": "handover_note",
+          "type": "textarea",
+          "label": "Handover Note to Service Point",
+          "rows": 2,
+          "maxLength": 200,
+          "placeholder": "1-2 lines max - key cues only",
+          "helperText": "Brief handover note (max 200 characters)",
+          "columnSpan": "full"
+        },
+        {
+          "id": "booking_requested",
+          "type": "toggle",
+          "label": "Send to Booking Queue",
+          "helperText": "Creates booking request for Customer Care",
+          "columnSpan": "full"
+        }
+      ]
+    }
+  ]
+}

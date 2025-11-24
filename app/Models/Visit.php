@@ -30,23 +30,27 @@ class Visit extends Model
         'current_stage',
         'status',
         'checked_in_by',
+        
         // Service Availability
-'service_available',
-'unavailability_reason',
-'unavailability_notes',
+        'service_available',
+        'unavailability_reason',
+        'unavailability_notes',
 
-// Flags
-'is_emergency',
-'requires_followup',
+        // Flags
+        'is_emergency',
+        'requires_followup',
 
-// Notes
-'purpose_notes',
+        // Notes
+        'purpose_notes',
     ];
 
     protected $casts = [
         'check_in_time' => 'datetime',
         'check_out_time' => 'datetime',
         'is_appointment' => 'boolean',
+        'is_emergency' => 'boolean',
+        'requires_followup' => 'boolean',
+        'service_available' => 'boolean',
     ];
 
     /**
@@ -153,6 +157,156 @@ class Visit extends Model
     }
 
     /**
+     * Get medical holds
+     */
+    public function medicalHolds(): HasMany
+    {
+        return $this->hasMany(MedicalHold::class);
+    }
+
+    /**
+     * Get crisis incidents
+     */
+    public function crisisIncidents(): HasMany
+    {
+        return $this->hasMany(CrisisIncident::class);
+    }
+
+    /**
+     * ================================================================
+     * NEW TRIAGE VERIFICATION METHODS (Phase 1)
+     * ================================================================
+     */
+
+    /**
+     * Check if visit has valid triage clearance
+     */
+    public function hasValidTriage(): bool
+    {
+        $triage = $this->currentTriage();
+        return $triage && $triage->isClearedForService();
+    }
+
+    /**
+     * Get current triage (non-expired)
+     */
+    public function currentTriage(): ?Triage
+    {
+        return $this->triage()
+            ->where('is_expired', false)
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Check if visit has medical hold
+     */
+    public function hasMedicalHold(): bool
+    {
+        $triage = $this->currentTriage();
+        return $triage && $triage->hasMedicalHold();
+    }
+
+    /**
+     * Check if crisis protocol is active
+     */
+    public function hasCrisisProtocol(): bool
+    {
+        $triage = $this->currentTriage();
+        return $triage && $triage->isCrisis();
+    }
+
+    /**
+     * Check if active medical hold exists
+     */
+    public function hasActiveMedicalHold(): bool
+    {
+        return $this->medicalHolds()
+            ->where('status', 'active')
+            ->exists();
+    }
+
+    /**
+     * Block service access if not triaged or has holds
+     * 
+     * This is the CRITICAL safety check
+     */
+    public function canProceedToService(): bool
+    {
+        // Must have valid triage
+        if (!$this->hasValidTriage()) {
+            return false;
+        }
+        
+        // Cannot have medical hold
+        if ($this->hasMedicalHold() || $this->hasActiveMedicalHold()) {
+            return false;
+        }
+        
+        // Cannot have crisis protocol
+        if ($this->hasCrisisProtocol()) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Get blocking reason (for user feedback)
+     */
+    public function getServiceBlockReason(): ?string
+    {
+        if (!$this->triage()->exists()) {
+            return 'No triage assessment completed';
+        }
+
+        $triage = $this->currentTriage();
+        
+        if (!$triage) {
+            return 'Triage has expired - reassessment required';
+        }
+
+        if ($triage->hasMedicalHold()) {
+            return 'Medical hold active - clearance required';
+        }
+
+        if ($triage->isCrisis()) {
+            return 'Crisis protocol active - immediate intervention required';
+        }
+
+        if ($this->hasActiveMedicalHold()) {
+            return 'Active medical hold pending clearance';
+        }
+
+        return null;
+    }
+
+    /**
+     * Get triage priority for queue ordering
+     */
+    public function getTriagePriority(): string
+    {
+        $triage = $this->currentTriage();
+        return $triage ? $triage->getQueuePriority() : 'normal';
+    }
+
+    /**
+     * Check if triage is required for this visit type
+     */
+    public function requiresTriage(): bool
+    {
+        // All visits require triage except follow-up appointments for stable clients
+        // This logic can be customized based on business rules
+        return true;
+    }
+
+    /**
+     * ================================================================
+     * EXISTING METHODS (Keep as-is)
+     * ================================================================
+     */
+
+    /**
      * Move to next stage
      */
     public function moveToStage(string $stage): void
@@ -214,6 +368,40 @@ class Visit extends Model
     public function scopeToday($query)
     {
         return $query->whereDate('check_in_time', today());
+    }
+
+    /**
+     * Scope for visits pending triage
+     */
+    public function scopePendingTriage($query)
+    {
+        return $query->whereDoesntHave('triage')
+            ->orWhereHas('triage', function ($q) {
+                $q->where('is_expired', true);
+            });
+    }
+
+    /**
+     * Scope for visits with medical holds
+     */
+    public function scopeWithMedicalHold($query)
+    {
+        return $query->whereHas('triage', function ($q) {
+            $q->where('clearance_status', 'medical_hold');
+        })->orWhereHas('medicalHolds', function ($q) {
+            $q->where('status', 'active');
+        });
+    }
+
+    /**
+     * Scope for visits with crisis protocol
+     */
+    public function scopeWithCrisisProtocol($query)
+    {
+        return $query->whereHas('triage', function ($q) {
+            $q->where('clearance_status', 'crisis_protocol')
+                ->orWhere('crisis_protocol_activated', true);
+        });
     }
 
     /**

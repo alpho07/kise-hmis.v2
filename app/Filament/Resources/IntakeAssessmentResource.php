@@ -3,25 +3,30 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\IntakeAssessmentResource\Pages;
-use App\Models\Visit;
 use App\Models\IntakeAssessment;
+use App\Models\Visit;
+use App\Models\Service;
+use App\Models\ServiceBooking;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\HtmlString;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 
 class IntakeAssessmentResource extends Resource
 {
-    protected static ?string $model = Visit::class;
+    protected static ?string $model = IntakeAssessment::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
-    protected static ?string $navigationLabel = 'Intake Queue';
-    protected static ?string $modelLabel = 'Intake Assessment';
-    protected static ?string $pluralModelLabel = 'Intake Queue';
+
+    protected static ?string $navigationLabel = 'Intake Assessment';
+
     protected static ?string $navigationGroup = 'Clinical Workflow';
+
     protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
@@ -29,43 +34,127 @@ class IntakeAssessmentResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Client Intake Assessment')
-                    ->icon('heroicon-o-identification')
-                    ->description('Confirm client details and begin intake assessment')
-                    ->extraAttributes(['class' => 'bg-gradient-to-br from-primary-50 via-white to-primary-100/60 rounded-xl border border-primary-100 shadow-sm p-6'])
+                ->icon('heroicon-o-identification')
+                ->description('Confirm client details and begin intake assessment')
+                ->extraAttributes(['class' => 'bg-gradient-to-br from-primary-50 via-white to-primary-100/60 rounded-xl border border-primary-100 shadow-sm p-6'])
+                ->schema([
+                    Forms\Components\TextInput::make('service_required')
+                        ->label('Service Required')
+                        ->prefixIcon('heroicon-o-briefcase')
+                        ->placeholder('e.g. Therapy, Counseling, Evaluation')
+                        ->required(),
+
+                    Forms\Components\Textarea::make('presenting_complaint')
+                        ->label('Presenting Complaint')
+                        ->placeholder('Describe the main problem or reason for referral')
+                        ->rows(3)
+                        ->maxLength(500),
+
+                    Forms\Components\Select::make('referral_source')
+                        ->label('Referral Source')
+                        ->prefixIcon('heroicon-o-arrow-right-circle')
+                        ->options([
+                            'self' => 'Self Referral',
+                            'facility' => 'Health Facility',
+                            'school' => 'School',
+                            'organization' => 'Organization',
+                            'court' => 'Court / Legal',
+                            'other' => 'Other',
+                        ])
+                        ->placeholder('Select source')
+                        ->searchable(),
+
+                    Forms\Components\Textarea::make('intake_notes')
+                        ->label('Additional Notes')
+                        ->rows(3)
+                        ->placeholder('Add extra details or observations during intake'),
+                ]),
+
+                Forms\Components\Section::make('Service Selection & Billing')
+                    ->description('Select services and preview charges')
                     ->schema([
-                        Forms\Components\TextInput::make('service_required')
-                            ->label('Service Required')
-                            ->prefixIcon('heroicon-o-briefcase')
-                            ->placeholder('e.g. Therapy, Counseling, Evaluation')
-                            ->required(),
+                        Forms\Components\CheckboxList::make('selected_services')
+                            ->label('Select Services Required')
+                            ->options(Service::query()->pluck('name', 'id'))
+                            ->columns(3)
+                            ->reactive()
+                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                self::calculateQuote($state, $set, $get);
+                            })
+                            ->required()
+                            ->helperText('Select all services the client needs'),
 
-                        Forms\Components\Textarea::make('presenting_complaint')
-                            ->label('Presenting Complaint')
-                            ->placeholder('Describe the main problem or reason for referral')
-                            ->rows(3)
-                            ->maxLength(500)
-                            ->prefixIcon('heroicon-o-chat-bubble-bottom-center-text'),
+                        Forms\Components\Placeholder::make('service_breakdown')
+                            ->label('')
+                            ->content(function (callable $get) {
+                                return self::renderServiceBreakdown($get('selected_services'), $get);
+                            })
+                            ->visible(fn(callable $get) => !empty($get('selected_services'))),
 
-                        Forms\Components\Select::make('referral_source')
-                            ->label('Referral Source')
-                            ->prefixIcon('heroicon-o-arrow-right-circle')
-                            ->options([
-                                'self' => 'Self Referral',
-                                'facility' => 'Health Facility',
-                                'school' => 'School',
-                                'organization' => 'Organization',
-                                'court' => 'Court / Legal',
-                                'other' => 'Other',
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\Placeholder::make('subtotal_display')
+                                    ->label('Subtotal')
+                                    ->content(fn(callable $get) => 'KES ' . number_format($get('quote_subtotal') ?? 0, 2)),
+
+                                Forms\Components\Placeholder::make('tax_display')
+                                    ->label('Tax (16%)')
+                                    ->content(fn(callable $get) => 'KES ' . number_format($get('quote_tax') ?? 0, 2)),
+
+                                Forms\Components\Placeholder::make('total_display')
+                                    ->label('Total Amount')
+                                    ->content(fn(callable $get) => 'KES ' . number_format($get('quote_total') ?? 0, 2))
+                                    ->extraAttributes(['class' => 'text-xl font-bold text-success-600']),
                             ])
-                            ->placeholder('Select source')
-                            ->searchable(),
+                            ->visible(fn(callable $get) => !empty($get('selected_services'))),
 
-                        Forms\Components\Textarea::make('intake_notes')
-                            ->label('Additional Notes')
-                            ->rows(3)
-                            ->placeholder('Add extra details or observations during intake')
-                            ->prefixIcon('heroicon-o-pencil-square'),
-                    ]),
+                        Forms\Components\Hidden::make('quote_subtotal'),
+                        Forms\Components\Hidden::make('quote_tax'),
+                        Forms\Components\Hidden::make('quote_total'),
+                    ])
+                    ->collapsible(),
+
+                Forms\Components\Section::make('Billing Route Selection')
+                    ->description('Choose how to process billing for this client')
+                    ->schema([
+                        Forms\Components\Radio::make('billing_route')
+                            ->label('Send Client To')
+                            ->options([
+                                'billing' => 'Billing Department (for validation & insurance verification)',
+                                'cashier' => 'Cashier (direct payment - skip billing)',
+                            ])
+                            ->descriptions([
+                                'billing' => 'Billing officer will verify insurance, modify items if needed, and approve before payment',
+                                'cashier' => 'Client proceeds directly to cashier for immediate payment',
+                            ])
+                            ->required()
+                            ->default('billing')
+                            ->inline(false)
+                            ->reactive(),
+
+                        Forms\Components\Select::make('primary_payment_method')
+                            ->label('Expected Payment Method')
+                            ->options([
+                                'sha' => 'SHA (Social Health Authority)',
+                                'ncpwd' => 'NCPWD',
+                                'insurance' => 'Private Insurance',
+                                'cash' => 'Cash',
+                                'mpesa' => 'M-PESA',
+                                'credit' => 'Credit Account',
+                                'mixed' => 'Multiple Methods',
+                            ])
+                            ->required()
+                            ->native(false)
+                            ->helperText('Primary payment method (can be modified at billing/cashier)'),
+
+                        Forms\Components\Textarea::make('billing_notes')
+                            ->label('Notes for Billing/Cashier')
+                            ->rows(2)
+                            ->placeholder('Any special instructions for billing or payment...')
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn(callable $get) => !empty($get('selected_services')))
+                    ->collapsible(),
             ]);
     }
 
@@ -257,6 +346,54 @@ class IntakeAssessmentResource extends Resource
             ]);
     }
 
+    /**
+     * Calculate quote from selected services
+     */
+    protected static function calculateQuote($serviceIds, callable $set, callable $get): void
+    {
+        if (empty($serviceIds)) {
+            $set('quote_subtotal', 0);
+            $set('quote_tax', 0);
+            $set('quote_total', 0);
+            return;
+        }
+
+        $services = Service::whereIn('id', $serviceIds)->get();
+        $subtotal = $services->sum('price');
+        $tax = $subtotal * 0.16; // 16% VAT
+        $total = $subtotal + $tax;
+
+        $set('quote_subtotal', $subtotal);
+        $set('quote_tax', $tax);
+        $set('quote_total', $total);
+    }
+
+    /**
+     * Render service breakdown view
+     */
+    protected static function renderServiceBreakdown($serviceIds, callable $get): string
+    {
+        if (empty($serviceIds)) {
+            return '';
+        }
+
+        $services = Service::whereIn('id', $serviceIds)->get();
+        
+        $html = '<div class="space-y-2 p-4 bg-gray-50 rounded-lg">';
+        $html .= '<h4 class="font-semibold text-sm text-gray-700 mb-2">Selected Services:</h4>';
+        
+        foreach ($services as $service) {
+            $html .= '<div class="flex justify-between items-center text-sm">';
+            $html .= '<span class="text-gray-600">' . $service->name . '</span>';
+            $html .= '<span class="font-medium text-gray-900">KES ' . number_format($service->price, 2) . '</span>';
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>';
+        
+        return new \Illuminate\Support\HtmlString($html);
+    }
+
     public static function getPages(): array
     {
         return [
@@ -265,39 +402,5 @@ class IntakeAssessmentResource extends Resource
             'view' => Pages\ViewIntakeAssessment::route('/{record}'),
             'edit' => Pages\EditIntakeAssessment::route('/{record}/edit'),
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()
-            ->with(['client', 'stages', 'triage', 'intakeAssessment'])
-            ->where('current_stage', 'intake')
-            ->whereDate('check_in_time', today())
-            ->whereNull('check_out_time');
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return static::getModel()::where('current_stage', 'intake')
-            ->whereDate('check_in_time', today())
-            ->whereNull('check_out_time')
-            ->doesntHave('intakeAssessment')
-            ->count();
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        $count = (int) static::getNavigationBadge();
-        return $count > 10 ? 'danger' : ($count > 5 ? 'warning' : 'success');
-    }
-
-    public static function canCreate(): bool
-    {
-        return false; // Intake entries originate from triage
-    }
-
-    public static function canViewAny(): bool
-    {
-        return auth()->user()->hasRole(['intake_officer', 'assessment_coordinator', 'admin', 'super_admin']);
     }
 }

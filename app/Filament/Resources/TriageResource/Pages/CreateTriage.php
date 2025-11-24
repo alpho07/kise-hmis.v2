@@ -101,7 +101,7 @@ class CreateTriage extends CreateRecord
                 foreach ($this->redFlagsToCreate as $flagData) {
                     TriageRedFlag::create([
                         'triage_id' => $triage->id,
-                        'flag_category' => $flagData['flag_category'],
+                        //'flag_category' => $flagData['flag_category'],
                         'description' => $flagData['description'],
                         'severity' => $flagData['severity'],
                     ]);

@@ -137,6 +137,16 @@ class Client extends Model
     }
 
     /**
+     * NEW: Get active visit relationship
+     */
+    public function activeVisit()
+    {
+        return $this->hasOne(Visit::class)
+            ->where('status', 'in_progress')
+            ->latest();
+    }
+
+    /**
      * Accessors
      */
     public function getFullNameAttribute(): string
@@ -176,5 +186,13 @@ class Client extends Model
     public function scopeRegisteredBetween($query, $startDate, $endDate)
     {
         return $query->whereBetween('registration_date', [$startDate, $endDate]);
+    }
+
+    /**
+     * NEW: Check if client has active visit
+     */
+    public function hasActiveVisit(): bool
+    {
+        return $this->activeVisit()->exists();
     }
 }
