@@ -5,9 +5,13 @@ namespace App\Models;
 use App\Traits\BelongsToBranch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+
 
 class Client extends Model
 {
@@ -73,6 +77,32 @@ class Client extends Model
         'full_name',
         'age',
     ];
+
+    /**
+ * Get all service requests for this client
+ */
+public function serviceRequests(): HasMany
+{
+    return $this->hasMany(ServiceRequest::class);
+}
+
+/**
+ * Get active service requests (not completed/cancelled)
+ */
+public function activeServiceRequests()
+{
+    return $this->serviceRequests()
+        ->whereNotIn('status', ['completed', 'cancelled']);
+}
+
+/**
+ * Get pending payment service requests
+ */
+public function pendingServiceRequests()
+{
+    return $this->serviceRequests()
+        ->where('status', 'pending_payment');
+}
 
     /**
      * Activity Log Configuration
@@ -188,6 +218,7 @@ class Client extends Model
         return $query->whereBetween('registration_date', [$startDate, $endDate]);
     }
 
+
     /**
      * NEW: Check if client has active visit
      */
@@ -195,4 +226,94 @@ class Client extends Model
     {
         return $this->activeVisit()->exists();
     }
+
+
+/**
+ * Credit Account relationship
+ */
+public function creditAccount(): HasOne
+{
+    return $this->hasOne(\App\Models\ClientCreditAccount::class);
+}
+
+/**
+ * All credit transactions through the credit account
+ */
+public function creditTransactions(): HasManyThrough
+{
+    return $this->hasManyThrough(
+        \App\Models\CreditTransaction::class,
+        \App\Models\ClientCreditAccount::class,
+        'client_id',      // Foreign key on credit_accounts table
+        'credit_account_id', // Foreign key on credit_transactions table
+        'id',             // Local key on clients table
+        'id'              // Local key on credit_accounts table
+    );
+}
+
+/**
+ * Check if client has active credit account
+ */
+public function hasActiveCreditAccount(): bool
+{
+    return $this->creditAccount()
+        ->where('status', 'active')
+        ->exists();
+}
+
+/**
+ * Get available credit
+ */
+public function getAvailableCredit(): float
+{
+    if (!$this->creditAccount) {
+        return 0;
+    }
+    
+    return $this->creditAccount->available_credit ?? 0;
+}
+
+/**
+ * Get credit balance (amount owed)
+ */
+public function getCreditBalance(): float
+{
+    if (!$this->creditAccount) {
+        return 0;
+    }
+    
+    return $this->creditAccount->current_balance ?? 0;
+}
+
+/**
+ * Check if client can use credit for amount
+ */
+public function canUseCredit(float $amount): bool
+{
+    if (!$this->hasActiveCreditAccount()) {
+        return false;
+    }
+
+    return $this->creditAccount->hasAvailableCredit($amount);
+}
+
+/**
+ * Create or get credit account
+ */
+public function getOrCreateCreditAccount(float $creditLimit = 0): \App\Models\ClientCreditAccount
+{
+    if ($this->creditAccount) {
+        return $this->creditAccount;
+    }
+
+    return \App\Models\ClientCreditAccount::create([
+        'client_id' => $this->id,
+        'branch_id' => $this->branch_id ?? auth()->user()->branch_id ?? 1,
+        'credit_limit' => $creditLimit,
+        'current_balance' => 0,
+        'available_credit' => $creditLimit,
+        'status' => 'active',
+        'created_by' => auth()->id(),
+    ]);
+}
 }

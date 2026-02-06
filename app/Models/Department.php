@@ -35,6 +35,40 @@ class Department extends Model
     ];
 
     /**
+ * Get all service requests received by this department
+ */
+public function receivedServiceRequests(): HasMany
+{
+    return $this->hasMany(ServiceRequest::class, 'service_department_id');
+}
+
+/**
+ * Get all service requests sent from this department
+ */
+public function sentServiceRequests(): HasMany
+{
+    return $this->hasMany(ServiceRequest::class, 'requesting_department_id');
+}
+
+/**
+ * Get pending service requests for this department
+ */
+public function pendingServiceRequests()
+{
+    return $this->receivedServiceRequests()
+        ->where('status', 'pending_payment');
+}
+
+/**
+ * Get paid service requests awaiting service creation
+ */
+public function paidServiceRequests()
+{
+    return $this->receivedServiceRequests()
+        ->where('status', 'paid');
+}
+
+    /**
      * Get the branch this department belongs to
      */
     public function branch(): BelongsTo

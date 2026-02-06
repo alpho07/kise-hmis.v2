@@ -69,6 +69,23 @@ class Service extends Model
      * RELATIONSHIPS
      */
 
+    /**
+ * Get all service requests for this service
+ */
+public function serviceRequests(): HasMany
+{
+    return $this->hasMany(ServiceRequest::class);
+}
+
+/**
+ * Get pending service requests
+ */
+public function pendingRequests()
+{
+    return $this->serviceRequests()
+        ->where('status', 'pending_payment');
+}
+
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
@@ -191,4 +208,43 @@ class Service extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
+
+    public function getAssessmentFormsAttribute()
+    {
+        // Use a cached property to avoid multiple queries
+        if (!isset($this->attributes['_assessment_forms_cache'])) {
+            $departmentName = $this->department?->name;
+            $category = $this->category;
+            
+            $this->attributes['_assessment_forms_cache'] = \App\Models\AssessmentFormSchema::query()
+                ->where('is_active', true)
+                ->where(function($query) use ($departmentName, $category) {
+                    // Match by department name (e.g., "Vision", "Audiology")
+                    if ($departmentName) {
+                        $query->where('category', 'like', "%{$departmentName}%");
+                    }
+                    
+                    // Or match by service category
+                    if ($category) {
+                        $query->orWhere('category', 'like', "%{$category}%");
+                    }
+                    
+                    // Or match by service name keywords
+                    if ($this->name) {
+                        $serviceKeywords = explode(' ', $this->name);
+                        foreach ($serviceKeywords as $keyword) {
+                            if (strlen($keyword) > 3) { // Only meaningful words
+                                $query->orWhere('category', 'like', "%{$keyword}%")
+                                      ->orWhere('name', 'like', "%{$keyword}%");
+                            }
+                        }
+                    }
+                })
+                ->orderBy('name')
+                ->get();
+        }
+        
+        return $this->attributes['_assessment_forms_cache'];
+    }
+
 }

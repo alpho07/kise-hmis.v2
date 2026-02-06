@@ -4,328 +4,95 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\BillingResource\Pages;
 use App\Models\Invoice;
-use App\Models\Visit;
-use App\Models\Service;
-use App\Models\ServiceBooking;
-use App\Models\InsuranceProvider;
+use App\Models\InsuranceClaim;
+use App\Services\InsuranceClaimService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
 
 class BillingResource extends Resource
 {
     protected static ?string $model = Invoice::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
-    protected static ?string $navigationLabel = 'Billing';
-    protected static ?string $navigationGroup = 'Financial';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    protected static ?string $navigationLabel = 'Billing Admin';
+    protected static ?string $modelLabel = 'Invoice';
+    protected static ?string $pluralModelLabel = 'Billing Admin';
+    protected static ?string $navigationGroup = 'Financial Management';
+    protected static ?int $navigationSort = 2;
 
+    /**
+     * Only show invoices that need billing admin attention
+     */
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where(function ($query) {
-                $query->whereHas('visit', function ($q) {
-                    $q->where('current_stage', 'billing');
-                })->orWhere('status', 'draft');
-            })
-            ->latest();
+            ->where('has_sponsor', true)
+            ->whereIn('status', ['pending', 'verified', 'approved'])
+            ->with(['client', 'visit', 'insuranceProvider', 'items.service']);
     }
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Invoice & Client Information')
+                Forms\Components\Section::make('Invoice Information')
                     ->schema([
-                        Forms\Components\Grid::make(3)
-                            ->schema([
-                                Forms\Components\TextInput::make('invoice_number')
-                                    ->label('Invoice Number')
-                                    ->disabled()
-                                    ->dehydrated(),
+                        Forms\Components\TextInput::make('invoice_number')
+                            ->label('Invoice Number')
+                            ->disabled(),
 
-                                Forms\Components\Select::make('status')
-                                    ->options([
-                                        'draft' => 'Draft',
-                                        'pending' => 'Pending Payment',
-                                        'paid' => 'Paid',
-                                        'cancelled' => 'Cancelled',
-                                    ])
-                                    ->default('draft')
-                                    ->disabled(fn($context) => $context === 'create')
-                                    ->native(false),
+                        Forms\Components\Select::make('client_id')
+                            ->relationship('client', 'first_name')
+                            ->disabled(),
 
-                                Forms\Components\Select::make('visit_id')
-                                    ->label('Visit')
-                                    ->relationship('visit', 'visit_number')
-                                    ->searchable()
-                                    ->required()
-                                    ->disabled(fn($context) => $context === 'edit'),
-                            ]),
+                        Forms\Components\TextInput::make('total_amount')
+                            ->label('Total Amount')
+                            ->numeric()
+                            ->prefix('KES')
+                            ->disabled(),
 
-                        Forms\Components\Grid::make(3)
-                            ->schema([
-                                Forms\Components\TextInput::make('client.full_name')
-                                    ->label('Client Name')
-                                    ->disabled()
-                                    ->dehydrated(false),
+                        Forms\Components\TextInput::make('total_sponsor_amount')
+                            ->label('Sponsor Amount')
+                            ->numeric()
+                            ->prefix('KES')
+                            ->disabled(),
 
-                                Forms\Components\TextInput::make('client.uci')
-                                    ->label('UCI')
-                                    ->disabled()
-                                    ->dehydrated(false),
-
-                                Forms\Components\TextInput::make('client.phone')
-                                    ->label('Phone')
-                                    ->disabled()
-                                    ->dehydrated(false),
-                            ]),
+                        Forms\Components\TextInput::make('total_client_amount')
+                            ->label('Client Amount')
+                            ->numeric()
+                            ->prefix('KES')
+                            ->disabled(),
                     ])
-                    ->collapsible(),
+                    ->columns(2),
 
-                Forms\Components\Section::make('Service Items Management')
-                    ->description('Add, modify, or remove service items')
+                Forms\Components\Section::make('Verification Details')
                     ->schema([
-                        Forms\Components\Repeater::make('items')
-                            ->relationship('items')
-                            ->schema([
-                                Forms\Components\Grid::make(6)
-                                    ->schema([
-                                        Forms\Components\Select::make('service_id')
-                                            ->label('Service')
-                                            ->options(Service::query()->pluck('name', 'id'))
-                                            ->required()
-                                            ->searchable()
-                                            ->reactive()
-                                            ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                                if ($state) {
-                                                    $service = Service::find($state);
-                                                    if ($service) {
-                                                        $set('service_name', $service->name);
-                                                        $set('unit_price', $service->price);
-                                                        
-                                                        // Auto-calculate subtotal
-                                                        $quantity = $get('quantity') ?? 1;
-                                                        $set('subtotal', $service->price * $quantity);
-                                                    }
-                                                }
-                                            })
-                                            ->columnSpan(2),
-
-                                        Forms\Components\TextInput::make('unit_price')
-                                            ->label('Unit Price')
-                                            ->numeric()
-                                            ->prefix('KES')
-                                            ->required()
-                                            ->reactive()
-                                            ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                                                $quantity = $get('quantity') ?? 1;
-                                                $set('subtotal', $state * $quantity);
-                                            })
-                                            ->columnSpan(1),
-
-                                        Forms\Components\TextInput::make('quantity')
-                                            ->label('Qty')
-                                            ->numeric()
-                                            ->default(1)
-                                            ->required()
-                                            ->minValue(1)
-                                            ->reactive()
-                                            ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                                                $unitPrice = $get('unit_price') ?? 0;
-                                                $set('subtotal', $state * $unitPrice);
-                                            })
-                                            ->columnSpan(1),
-
-                                        Forms\Components\TextInput::make('discount')
-                                            ->label('Discount')
-                                            ->numeric()
-                                            ->prefix('KES')
-                                            ->default(0)
-                                            ->reactive()
-                                            ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                                                $unitPrice = $get('unit_price') ?? 0;
-                                                $quantity = $get('quantity') ?? 1;
-                                                $subtotal = ($unitPrice * $quantity) - $state;
-                                                $set('subtotal', max(0, $subtotal));
-                                            })
-                                            ->columnSpan(1),
-
-                                        Forms\Components\TextInput::make('subtotal')
-                                            ->label('Subtotal')
-                                            ->numeric()
-                                            ->prefix('KES')
-                                            ->disabled()
-                                            ->dehydrated()
-                                            ->columnSpan(1),
-                                    ]),
-
-                                Forms\Components\Textarea::make('notes')
-                                    ->label('Item Notes')
-                                    ->rows(1)
-                                    ->placeholder('Special instructions for this service...')
-                                    ->columnSpanFull(),
-
-                                Forms\Components\Hidden::make('service_name'),
+                        Forms\Components\Select::make('payment_method')
+                            ->options([
+                                'sha' => 'SHA',
+                                'ncpwd' => 'NCPWD',
+                                'insurance_private' => 'Private Insurance',
+                                'waiver' => 'Waiver',
                             ])
-                            ->defaultItems(0)
-                            ->addActionLabel('Add Service Item')
-                            ->reorderable()
-                            ->collapsible()
-                            ->itemLabel(fn (array $state): ?string => $state['service_name'] ?? 'New Service')
-                            ->live()
-                            ->afterStateUpdated(function (callable $get, callable $set) {
-                                self::updateTotals($get, $set);
-                            })
-                            ->deleteAction(
-                                fn ($action) => $action->requiresConfirmation()
-                            ),
-                    ])
-                    ->collapsible(),
+                            ->disabled(),
 
-                Forms\Components\Section::make('Insurance & Payment Validation')
-                    ->description('Verify insurance coverage and set payment methods')
-                    ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\Select::make('payment_method')
-                                    ->label('Primary Payment Method')
-                                    ->options([
-                                        'sha' => 'SHA (Social Health Authority)',
-                                        'ncpwd' => 'NCPWD',
-                                        'insurance' => 'Private Insurance',
-                                        'cash' => 'Cash',
-                                        'mpesa' => 'M-PESA',
-                                        'credit' => 'Credit Account',
-                                        'bank_transfer' => 'Bank Transfer',
-                                        'mixed' => 'Multiple Payment Methods',
-                                    ])
-                                    ->required()
-                                    ->reactive()
-                                    ->native(false),
-
-                                Forms\Components\Select::make('insurance_provider_id')
-                                    ->label('Insurance Provider')
-                                    ->relationship('insuranceProvider', 'name')
-                                    ->searchable()
-                                    ->preload()
-                                    ->visible(fn(callable $get) => in_array($get('payment_method'), ['sha', 'ncpwd', 'insurance']))
-                                    ->required(fn(callable $get) => in_array($get('payment_method'), ['sha', 'ncpwd', 'insurance'])),
-                            ]),
-
-                        Forms\Components\Repeater::make('payment_splits')
-                            ->label('Payment Method Breakdown')
-                            ->schema([
-                                Forms\Components\Grid::make(3)
-                                    ->schema([
-                                        Forms\Components\Select::make('method')
-                                            ->label('Payment Method')
-                                            ->options([
-                                                'sha' => 'SHA',
-                                                'ncpwd' => 'NCPWD',
-                                                'insurance' => 'Insurance',
-                                                'cash' => 'Cash',
-                                                'mpesa' => 'M-PESA',
-                                                'credit' => 'Credit',
-                                                'bank_transfer' => 'Bank Transfer',
-                                            ])
-                                            ->required()
-                                            ->native(false),
-
-                                        Forms\Components\TextInput::make('amount')
-                                            ->label('Amount')
-                                            ->numeric()
-                                            ->prefix('KES')
-                                            ->required()
-                                            ->reactive(),
-
-                                        Forms\Components\Select::make('insurance_provider_id')
-                                            ->label('Provider')
-                                            ->options(InsuranceProvider::pluck('name', 'id'))
-                                            ->searchable()
-                                            ->visible(fn(callable $get) => in_array($get('method'), ['sha', 'ncpwd', 'insurance'])),
-                                    ]),
-
-                                Forms\Components\Textarea::make('notes')
-                                    ->label('Notes')
-                                    ->rows(1)
-                                    ->placeholder('Reference numbers, approval codes, etc.')
-                                    ->columnSpanFull(),
-                            ])
-                            ->visible(fn(callable $get) => $get('payment_method') === 'mixed')
-                            ->defaultItems(0)
-                            ->addActionLabel('Add Payment Method')
-                            ->collapsible()
-                            ->columnSpanFull(),
+                        Forms\Components\Select::make('insurance_provider_id')
+                            ->relationship('insuranceProvider', 'name')
+                            ->disabled(),
 
                         Forms\Components\Textarea::make('payment_notes')
-                            ->label('Payment Validation Notes')
-                            ->rows(3)
-                            ->placeholder('Insurance verification details, approval codes, coverage limits...')
-                            ->columnSpanFull(),
+                            ->label('Notes')
+                            ->rows(3),
                     ])
-                    ->collapsible(),
-
-                Forms\Components\Section::make('Financial Summary')
-                    ->schema([
-                        Forms\Components\Grid::make(4)
-                            ->schema([
-                                Forms\Components\TextInput::make('total_amount')
-                                    ->label('Subtotal')
-                                    ->numeric()
-                                    ->prefix('KES')
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->default(0),
-
-                                Forms\Components\TextInput::make('tax_amount')
-                                    ->label('Tax (16% VAT)')
-                                    ->numeric()
-                                    ->prefix('KES')
-                                    ->default(0)
-                                    ->reactive()
-                                    ->afterStateUpdated(function (callable $get, callable $set) {
-                                        self::updateTotals($get, $set);
-                                    }),
-
-                                Forms\Components\TextInput::make('discount_amount')
-                                    ->label('Overall Discount')
-                                    ->numeric()
-                                    ->prefix('KES')
-                                    ->default(0)
-                                    ->reactive()
-                                    ->afterStateUpdated(function (callable $get, callable $set) {
-                                        self::updateTotals($get, $set);
-                                    })
-                                    ->helperText('Additional discount on entire invoice'),
-
-                                Forms\Components\TextInput::make('final_amount')
-                                    ->label('Final Amount')
-                                    ->numeric()
-                                    ->prefix('KES')
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->default(0)
-                                    ->extraAttributes(['class' => 'font-bold text-xl']),
-                            ]),
-
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Internal Notes')
-                            ->rows(2)
-                            ->placeholder('Internal billing notes...')
-                            ->columnSpanFull(),
-                    ])
-                    ->collapsible(),
-
-                Forms\Components\Hidden::make('client_id'),
-                Forms\Components\Hidden::make('payment_administrator_id')
-                    ->default(auth()->id()),
+                    ->columns(2),
             ]);
     }
 
@@ -337,140 +104,466 @@ class BillingResource extends Resource
                     ->label('Invoice #')
                     ->searchable()
                     ->sortable()
-                    ->weight('semibold')
-                    ->icon('heroicon-o-document-text')
-                    ->copyable()
-                    ->color('primary'),
-
-                Tables\Columns\TextColumn::make('visit.visit_number')
-                    ->label('Visit')
-                    ->searchable()
-                    ->sortable(),
+                    ->weight('bold'),
 
                 Tables\Columns\TextColumn::make('client.full_name')
                     ->label('Client')
-                    ->searchable(['first_name', 'last_name'])
-                    ->weight('medium'),
+                    ->searchable()
+                    ->sortable(),
 
-                Tables\Columns\TextColumn::make('client.uci')
-                    ->label('UCI')
+                Tables\Columns\TextColumn::make('visit.client.uci')
+                    ->label('Client No #')
+                    ->searchable()
+                     ->weight('bold'),
+
+                Tables\Columns\TextColumn::make('payment_method')
+                    ->label('Payment Type')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'sha' => 'info',
+                        'ncpwd' => 'success',
+                        'insurance_private' => 'warning',
+                        'waiver' => 'danger',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'sha' => 'SHA',
+                        'ncpwd' => 'NCPWD',
+                        'insurance_private' => 'Insurance',
+                        'waiver' => 'Waiver',
+                        default => strtoupper($state),
+                    }),
+
+                Tables\Columns\TextColumn::make('insuranceProvider.name')
+                    ->label('Provider')
                     ->searchable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('final_amount')
-                    ->label('Amount')
+                Tables\Columns\TextColumn::make('total_amount')
+                    ->label('Total')
                     ->money('KES')
                     ->sortable()
-                    ->weight('bold')
-                    ->color('success'),
-
-                Tables\Columns\TextColumn::make('payment_method')
-                    ->badge()
-                    ->colors([
-                        'primary' => 'sha',
-                        'info' => 'ncpwd',
-                        'secondary' => 'insurance',
-                        'success' => 'cash',
-                        'warning' => 'mpesa',
-                        'gray' => ['credit', 'bank_transfer', 'mixed'],
+                    ->summarize([
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->money('KES')
+                            ->label('Total'),
                     ]),
 
-                Tables\Columns\TextColumn::make('status')
-                    ->badge()
+                Tables\Columns\TextColumn::make('total_sponsor_amount')
+                    ->label('Sponsor Amount')
+                    ->money('KES')
+                    ->color('info')
+                    ->sortable()
+                    ->summarize([
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->money('KES')
+                            ->label('Total Sponsor'),
+                    ]),
+
+                Tables\Columns\TextColumn::make('total_client_amount')
+                    ->label('Client Amount')
+                    ->money('KES')
+                    ->color('success')
+                    ->sortable()
+                    ->summarize([
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->money('KES')
+                            ->label('Total Client'),
+                    ]),
+
+                Tables\Columns\BadgeColumn::make('status')
+                    ->label('Status')
                     ->colors([
-                        'gray' => 'draft',
                         'warning' => 'pending',
-                        'success' => 'paid',
-                        'danger' => 'cancelled',
+                        'info' => 'verified',
+                        'success' => 'approved',
+                        'primary' => 'paid',
                     ]),
 
-                Tables\Columns\TextColumn::make('items_count')
-                    ->label('Items')
-                    ->counts('items')
-                    ->badge()
-                    ->color('info'),
+                Tables\Columns\IconColumn::make('has_sponsor')
+                    ->label('Sponsor')
+                    ->boolean()
+                    ->toggleable(),
 
-                Tables\Columns\TextColumn::make('issued_at')
+                Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')
-                    ->dateTime('d/m/Y H:i')
+                    ->dateTime('M d, Y H:i')
                     ->sortable()
                     ->toggleable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                Tables\Filters\SelectFilter::make('payment_method')
+                    ->label('Payment Type')
                     ->options([
-                        'draft' => 'Draft',
-                        'pending' => 'Pending',
-                        'paid' => 'Paid',
+                        'sha' => 'SHA',
+                        'ncpwd' => 'NCPWD',
+                        'insurance_private' => 'Private Insurance',
+                        'waiver' => 'Waiver',
                     ]),
 
-                Tables\Filters\SelectFilter::make('payment_method'),
+                Tables\Filters\SelectFilter::make('status')
+                    ->options([
+                        'pending' => 'Pending Verification',
+                        'verified' => 'Verified',
+                        'approved' => 'Approved',
+                    ]),
+
+                Tables\Filters\Filter::make('has_sponsor')
+                    ->label('Has Sponsor')
+                    ->query(fn (Builder $query): Builder => $query->where('has_sponsor', true)),
+
+                Tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')
+                            ->label('Created From'),
+                        Forms\Components\DatePicker::make('created_until')
+                            ->label('Created Until'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->visible(fn($record) => in_array($record->status, ['draft', 'pending'])),
+                // View Payment Breakdown
+                Tables\Actions\Action::make('view_breakdown')
+                    ->label('View Split')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->modalHeading(fn (Invoice $record) => 'Payment Breakdown - ' . $record->invoice_number)
+                    ->modalContent(fn (Invoice $record) => view('filament.components.payment-breakdown', [
+                        'invoice' => $record,
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
 
-                Tables\Actions\Action::make('approve')
-                    ->label('Approve & Send to Cashier')
+                // Verify Invoice (First step)
+                Tables\Actions\Action::make('verify')
+                    ->label('Verify')
                     ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn($record) => $record->status === 'draft')
+                    ->color('warning')
+                    ->visible(fn (Invoice $record) => $record->status === 'pending')
                     ->requiresConfirmation()
-                    ->modalHeading('Approve Invoice')
-                    ->modalDescription('This will approve the invoice and send it to cashier for payment.')
-                    ->action(function (Invoice $record) {
-                        DB::transaction(function () use ($record) {
+                    ->modalHeading('Verify Invoice')
+                    ->modalDescription(fn (Invoice $record) => 
+                        "Verify eligibility and documentation for {$record->client->full_name}. " .
+                        "This confirms the client is eligible for {$record->payment_method} coverage."
+                    )
+                    ->modalSubmitActionLabel('Verify Invoice')
+                    ->form([
+                        Forms\Components\Textarea::make('verification_notes')
+                            ->label('Verification Notes')
+                            ->placeholder('Document verification details: member card checked, eligibility confirmed, etc.')
+                            ->rows(3),
+                    ])
+                    ->action(function (Invoice $record, array $data) {
+                        $record->update([
+                            'status' => 'verified',
+                            'verification_status' => 'verified',
+                            'verification_notes' => $data['verification_notes'] ?? null,
+                            'verified_by' => auth()->id(),
+                            'verified_at' => now(),
+                        ]);
+
+                        Notification::make()
+                            ->success()
+                            ->title('Invoice Verified')
+                            ->body("Invoice {$record->invoice_number} has been verified and is ready for approval.")
+                            ->send();
+
+                        \Log::info('Invoice verified', [
+                            'invoice_id' => $record->id,
+                            'verified_by' => auth()->id(),
+                        ]);
+                    }),
+
+                // Approve Invoice (Second step - creates claim and routes to cashier)
+                Tables\Actions\Action::make('approve')
+                    ->label('Approve & Route')
+                    ->icon('heroicon-o-check-badge')
+                    ->color('success')
+                    ->visible(fn (Invoice $record) => $record->status === 'verified')
+                    ->requiresConfirmation()
+                    ->modalHeading('Approve Invoice & Create Insurance Claim')
+                    ->modalDescription(fn (Invoice $record) => 
+                        "Approve invoice and create insurance claim for {$record->client->full_name}. " .
+                        "Sponsor will cover KES " . number_format($record->total_sponsor_amount, 2) . ". " .
+                        "Client will be routed to cashier for KES " . number_format($record->total_client_amount, 2) . "."
+                    )
+                    ->modalSubmitActionLabel('Approve & Create Claim')
+                    ->form([
+                        Forms\Components\Textarea::make('approval_notes')
+                            ->label('Approval Notes')
+                            ->placeholder('Any special instructions or notes...')
+                            ->rows(2),
+                    ])
+                    ->action(function (Invoice $record, array $data) {
+                        \DB::transaction(function () use ($record, $data) {
+                            // Update invoice status
                             $record->update([
-                                'status' => 'pending',
-                                'payment_administrator_id' => auth()->id(),
+                                'status' => 'approved',
+                                'approval_notes' => $data['approval_notes'] ?? null,
+                                'approved_by' => auth()->id(),
+                                'approved_at' => now(),
+                                'sponsor_claim_status' => 'approved',
                             ]);
-                            
-                            $record->visit->moveToStage('payment');
+
+                            // Create insurance claim if sponsor amount > 0
+                            if ($record->total_sponsor_amount > 0) {
+                                $claimService = new InsuranceClaimService();
+                                $claim = $claimService->createClaimFromInvoice($record);
+
+                                \Log::info('Insurance claim created', [
+                                    'claim_id' => $claim->id,
+                                    'claim_number' => $claim->claim_number,
+                                    'invoice_id' => $record->id,
+                                ]);
+                            }
+
+                            // Update service bookings to confirmed
+                            $record->visit->serviceBookings()->update([
+                                'status' => 'confirmed',
+                                'payment_status' => 'pending',
+                            ]);
+
+                            // Route to cashier if client owes money
+                            if ($record->total_client_amount > 0) {
+                                $record->visit->update([
+                                    'current_stage' => 'cashier',
+                                    'current_stage_started_at' => now(),
+                                ]);
+
+                                $message = "Approved! Client routed to Cashier for KES " . 
+                                          number_format($record->total_client_amount, 2);
+                            } else {
+                                // Waiver or 100% covered - go straight to service
+                                $record->visit->update([
+                                    'current_stage' => 'service',
+                                    'current_stage_started_at' => now(),
+                                ]);
+
+                                $record->update([
+                                    'payment_status' => 'paid',
+                                    'client_payment_status' => 'waived',
+                                ]);
+
+                                $message = "Approved! 100% covered - Client routed to Service Point";
+                            }
 
                             Notification::make()
                                 ->success()
                                 ->title('Invoice Approved')
-                                ->body("Invoice {$record->invoice_number} sent to cashier.")
+                                ->body($message)
+                                ->duration(10000)
                                 ->send();
                         });
                     }),
 
+                // Reject Invoice
+                Tables\Actions\Action::make('reject')
+                    ->label('Reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->visible(fn (Invoice $record) => in_array($record->status, ['pending', 'verified']))
+                    ->requiresConfirmation()
+                    ->modalHeading('Reject Invoice')
+                    ->modalDescription('This will reject the invoice and return the client to intake for correction.')
+                    ->modalSubmitActionLabel('Reject Invoice')
+                    ->form([
+                        Forms\Components\Textarea::make('rejection_reason')
+                            ->label('Rejection Reason')
+                            ->required()
+                            ->placeholder('Explain why this invoice is being rejected...')
+                            ->rows(3),
+                    ])
+                    ->action(function (Invoice $record, array $data) {
+                        $record->update([
+                            'status' => 'rejected',
+                            'rejection_reason' => $data['rejection_reason'],
+                            'rejected_by' => auth()->id(),
+                            'rejected_at' => now(),
+                        ]);
+
+                        // Return to intake
+                        $record->visit->update([
+                            'current_stage' => 'intake',
+                            'current_stage_started_at' => now(),
+                        ]);
+
+                        Notification::make()
+                            ->danger()
+                            ->title('Invoice Rejected')
+                            ->body("Invoice {$record->invoice_number} rejected. Client returned to intake.")
+                            ->send();
+                    }),
+
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn (Invoice $record) => $record->status === 'pending'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    // Bulk Verify
+                    Tables\Actions\BulkAction::make('bulk_verify')
+                        ->label('Bulk Verify')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Verify Selected Invoices')
+                        ->modalDescription('Mark selected invoices as verified.')
+                        ->action(function ($records) {
+                            $count = 0;
+                            foreach ($records as $record) {
+                                if ($record->status === 'pending') {
+                                    $record->update([
+                                        'status' => 'verified',
+                                        'verification_status' => 'verified',
+                                        'verified_by' => auth()->id(),
+                                        'verified_at' => now(),
+                                    ]);
+                                    $count++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->success()
+                                ->title('Bulk Verification Complete')
+                                ->body("{$count} invoice(s) verified successfully.")
+                                ->send();
+                        }),
+
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }
 
-    protected static function updateTotals(callable $get, callable $set): void
+    public static function infolist(Infolist $infolist): Infolist
     {
-        $items = collect($get('items') ?? []);
-        $subtotal = $items->sum('subtotal');
-        $tax = (float) $get('tax_amount') ?: 0;
-        $discount = (float) $get('discount_amount') ?: 0;
-        
-        $finalAmount = $subtotal + $tax - $discount;
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Invoice Summary')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('total_amount')
+                                    ->label('Total Amount')
+                                    ->money('KES')
+                                    ->size('lg')
+                                    ->color('primary'),
 
-        $set('total_amount', number_format($subtotal, 2, '.', ''));
-        $set('final_amount', number_format(max(0, $finalAmount), 2, '.', ''));
+                                Infolists\Components\TextEntry::make('total_sponsor_amount')
+                                    ->label('Sponsor Pays')
+                                    ->money('KES')
+                                    ->size('lg')
+                                    ->color('info'),
+
+                                Infolists\Components\TextEntry::make('total_client_amount')
+                                    ->label('Client Pays')
+                                    ->money('KES')
+                                    ->size('lg')
+                                    ->color('success'),
+                            ]),
+                    ]),
+
+                Infolists\Components\Section::make('Client Information')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('client.full_name')
+                            ->label('Client Name'),
+                        Infolists\Components\TextEntry::make('client.phone')
+                            ->label('Phone'),
+                        Infolists\Components\TextEntry::make('visit.visit_number')
+                            ->label('Visit Number'),
+                    ])
+                    ->columns(3),
+
+                Infolists\Components\Section::make('Payment Details')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('payment_method')
+                            ->label('Payment Method')
+                            ->badge(),
+                        Infolists\Components\TextEntry::make('insuranceProvider.name')
+                            ->label('Insurance Provider'),
+                        Infolists\Components\TextEntry::make('status')
+                            ->badge(),
+                    ])
+                    ->columns(3),
+
+                Infolists\Components\Section::make('Invoice Items')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('items')
+                            ->label('Services')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('service.name')
+                                    ->label('Service'),
+                                Infolists\Components\TextEntry::make('quantity')
+                                    ->label('Qty'),
+                                Infolists\Components\TextEntry::make('unit_price')
+                                    ->money('KES')
+                                    ->label('Unit Price'),
+                                Infolists\Components\TextEntry::make('subtotal')
+                                    ->money('KES')
+                                    ->label('Subtotal'),
+                                Infolists\Components\TextEntry::make('sponsor_amount')
+                                    ->money('KES')
+                                    ->label('Sponsor')
+                                    ->color('info'),
+                                Infolists\Components\TextEntry::make('client_amount')
+                                    ->money('KES')
+                                    ->label('Client')
+                                    ->color('success'),
+                            ])
+                            ->columns(6),
+                    ]),
+
+                Infolists\Components\Section::make('Verification & Approval')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('verification_notes')
+                            ->label('Verification Notes')
+                            ->default('Not verified yet'),
+                        Infolists\Components\TextEntry::make('approval_notes')
+                            ->label('Approval Notes')
+                            ->default('Not approved yet'),
+                        Infolists\Components\TextEntry::make('verified_at')
+                            ->label('Verified At')
+                            ->dateTime(),
+                        Infolists\Components\TextEntry::make('approved_at')
+                            ->label('Approved At')
+                            ->dateTime(),
+                    ])
+                    ->columns(2)
+                    ->visible(fn (Invoice $record) => 
+                        $record->verified_at || $record->approved_at
+                    ),
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
     }
 
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListBillings::route('/'),
-            'create' => Pages\CreateBilling::route('/create'),
-            'edit' => Pages\EditBilling::route('/{record}/edit'),
             'view' => Pages\ViewBilling::route('/{record}'),
+            'edit' => Pages\EditBilling::route('/{record}/edit'),
         ];
     }
 
     public static function getNavigationBadge(): ?string
     {
-        return static::getModel()::where('status', 'draft')->count() ?: null;
+        return static::getModel()::where('status', 'pending')->count() ?: null;
     }
 
     public static function getNavigationBadgeColor(): ?string

@@ -15,6 +15,7 @@ class Queue extends Model
     protected $fillable = [
         'department_id',
         'branch_id',
+        'visit_id',
         'name',
         'date',
         'max_capacity',

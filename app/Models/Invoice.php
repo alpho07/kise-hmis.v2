@@ -14,7 +14,7 @@ use Spatie\Activitylog\LogOptions;
 
 class Invoice extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity,BelongsToBranch;
+    use HasFactory, SoftDeletes, LogsActivity, BelongsToBranch;
 
     protected $fillable = [
         'visit_id',
@@ -31,8 +31,16 @@ class Invoice extends Model
         'due_date',
         'notes',
         'payment_administrator_id',
-    'payment_notes',
-    'insurance_provider_id',
+        'payment_notes',
+        'insurance_provider_id',
+        
+        // ✅ ADDED: Insurance/Sponsor Split Columns
+        'total_sponsor_amount',
+        'total_client_amount',
+        'amount_paid',
+        'has_sponsor',
+        'client_payment_status',
+        'sponsor_claim_status',
     ];
 
     protected $casts = [
@@ -42,6 +50,12 @@ class Invoice extends Model
         'final_amount' => 'decimal:2',
         'issued_at' => 'datetime',
         'due_date' => 'date',
+        
+        // ✅ ADDED: Casts for new columns
+        'total_sponsor_amount' => 'decimal:2',
+        'total_client_amount' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
+        'has_sponsor' => 'boolean',
     ];
 
     /**
@@ -62,14 +76,14 @@ class Invoice extends Model
     }
 
     public function paymentAdministrator(): BelongsTo
-{
-    return $this->belongsTo(User::class, 'payment_administrator_id');
-}
+    {
+        return $this->belongsTo(User::class, 'payment_administrator_id');
+    }
 
-public function insuranceProvider(): BelongsTo
-{
-    return $this->belongsTo(InsuranceProvider::class);
-}
+    public function insuranceProvider(): BelongsTo
+    {
+        return $this->belongsTo(InsuranceProvider::class);
+    }
 
     /**
      * Get the visit
@@ -104,11 +118,27 @@ public function insuranceProvider(): BelongsTo
     }
 
     /**
-     * Get the payment
+     * ✅ ADDED: Get all payments for this invoice
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Get the payment (legacy - single payment)
      */
     public function payment(): HasOne
     {
         return $this->hasOne(Payment::class);
+    }
+
+    /**
+     * ✅ ADDED: Get the insurance claim for this invoice
+     */
+    public function claim(): HasOne
+    {
+        return $this->hasOne(InsuranceClaim::class);
     }
 
     /**
@@ -118,6 +148,12 @@ public function insuranceProvider(): BelongsTo
     {
         $this->total_amount = $this->items->sum('subtotal');
         $this->final_amount = $this->total_amount + $this->tax_amount - $this->discount_amount;
+        
+        // ✅ ADDED: Calculate sponsor/client splits
+        $this->total_sponsor_amount = $this->items->sum('sponsor_amount');
+        $this->total_client_amount = $this->items->sum('client_amount');
+        $this->has_sponsor = $this->total_sponsor_amount > 0;
+        
         $this->save();
     }
 

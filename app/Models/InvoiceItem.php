@@ -24,6 +24,14 @@ class InvoiceItem extends Model
         'insurance_provider_id',
         'insurance_covered_amount',
         'client_copay_amount',
+        
+        // ✅ ADDED: Sponsor/Client Split Columns
+        'sponsor_type',
+        'sponsor_percentage',
+        'sponsor_amount',
+        'client_amount',
+        'client_payment_status',
+        'sponsor_claim_status',
     ];
 
     protected $casts = [
@@ -33,13 +41,18 @@ class InvoiceItem extends Model
         'discount_amount' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'insurance_covered_amount' => 'decimal:2',
-    'client_copay_amount' => 'decimal:2',
+        'client_copay_amount' => 'decimal:2',
+        
+        // ✅ ADDED: Casts for split columns
+        'sponsor_percentage' => 'decimal:2',
+        'sponsor_amount' => 'decimal:2',
+        'client_amount' => 'decimal:2',
     ];
 
     public function insuranceProvider(): BelongsTo
-{
-    return $this->belongsTo(InsuranceProvider::class);
-}
+    {
+        return $this->belongsTo(InsuranceProvider::class);
+    }
 
     /**
      * Boot method to calculate subtotal
@@ -52,10 +65,22 @@ class InvoiceItem extends Model
             if (!$item->subtotal) {
                 $item->subtotal = $item->quantity * $item->unit_price;
             }
+            
+            // ✅ ADDED: Auto-calculate sponsor/client split if not set
+            if ($item->sponsor_percentage && !$item->sponsor_amount) {
+                $item->sponsor_amount = ($item->subtotal * $item->sponsor_percentage) / 100;
+                $item->client_amount = $item->subtotal - $item->sponsor_amount;
+            }
         });
 
         static::updating(function ($item) {
             $item->subtotal = $item->quantity * $item->unit_price;
+            
+            // ✅ ADDED: Recalculate split on update
+            if ($item->sponsor_percentage) {
+                $item->sponsor_amount = ($item->subtotal * $item->sponsor_percentage) / 100;
+                $item->client_amount = $item->subtotal - $item->sponsor_amount;
+            }
         });
     }
 
@@ -89,5 +114,13 @@ class InvoiceItem extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * ✅ ADDED: Calculate total amount (subtotal - discount + tax)
+     */
+    public function getTotalAmountAttribute(): float
+    {
+        return $this->subtotal - ($this->discount_amount ?? 0) + ($this->tax_amount ?? 0);
     }
 }

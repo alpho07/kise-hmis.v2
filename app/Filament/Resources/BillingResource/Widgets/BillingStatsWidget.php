@@ -50,7 +50,7 @@ class BillingStatsWidget extends BaseWidget
 
             Stat::make('Monthly Revenue', 'KES ' . number_format($totalRevenue, 2))
                 ->description('Current month')
-                ->descriptionIcon('heroicon-m-trending-up')
+                ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('primary')
                 ->chart([100, 150, 120, 180, 200, 220, $totalRevenue / 1000]),
         ];

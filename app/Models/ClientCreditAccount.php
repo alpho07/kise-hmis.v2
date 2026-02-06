@@ -138,4 +138,29 @@ class ClientCreditAccount extends Model
     {
         $this->update(['status' => 'active']);
     }
+
+    public function getAvailableCredit(): float
+    {
+        return $this->creditAccount->available_credit ?? 0;
+    }
+
+    /**
+     * Get credit balance (amount owed)
+     */
+    public function getCreditBalance(): float
+    {
+        return $this->creditAccount->current_balance ?? 0;
+    }
+
+    /**
+     * Check if client can use credit for amount
+     */
+    public function canUseCredit(float $amount): bool
+    {
+        if (!$this->hasActiveCreditAccount()) {
+            return false;
+        }
+
+        return $this->creditAccount->hasAvailableCredit($amount);
+    }
 }

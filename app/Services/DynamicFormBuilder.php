@@ -3,30 +3,82 @@
 namespace App\Services;
 
 use App\Models\AssessmentFormSchema;
+use App\Models\Visit;
+use App\Models\Client;
+use App\Models\County;
+use App\Models\SubCounty;
+use App\Models\Ward;
+use App\Models\Service;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Illuminate\Support\Str;
+use Illuminate\Support\HtmlString;
 
+/**
+ * Enhanced Dynamic Form Builder
+ * 
+ * Features:
+ * - Auto-loads client & visit data
+ * - Cascading dropdowns (County → Sub-County → Ward)
+ * - Service selection with cost preview
+ * - Billing integration
+ */
 class DynamicFormBuilder
 {
+    protected ?Visit $visit = null;
+    protected ?Client $client = null;
+
     /**
-     * Build complete form from schema
+     * Build complete form from schema with visit context
+     * 
+     * @param AssessmentFormSchema $schema The form schema to build
+     * @param int|null $visitId Visit ID from URL (for create) or null (for edit/view)
+     * @param mixed $record The current record being edited (for edit/view pages)
      */
-    public static function buildForm(AssessmentFormSchema $schema): array
+    public static function buildForm(AssessmentFormSchema $schema, ?int $visitId = null, $record = null): array
     {
+        $instance = new self();
+        
+        // Determine visit_id - priority: record > URL parameter
+        if ($record && isset($record->visit_id)) {
+            $visitId = $record->visit_id;
+        } elseif (!$visitId) {
+            $visitId = request()->query('visit_id');
+        }
+        
+        // Load visit and client if we have visit_id
+        if ($visitId) {
+            $instance->visit = Visit::with(['client', 'triage'])->find($visitId);
+            $instance->client = $instance->visit?->client;
+        }
+
         $components = [];
 
-        // Add hidden fields for tracking
+        // Add hidden fields for tracking - MUST BE DEHYDRATED TO SAVE
         $components[] = Forms\Components\Hidden::make('form_schema_id')
-            ->default($schema->id);
+            ->default($schema->id)
+            ->dehydrated(true);
+
+        $components[] = Forms\Components\Hidden::make('visit_id')
+            ->default($visitId)
+            ->dehydrated(true);
+
+        $components[] = Forms\Components\Hidden::make('client_id')
+            ->default($instance->client?->id)
+            ->dehydrated(true);
+
+        $components[] = Forms\Components\Hidden::make('branch_id')
+            ->default($instance->visit?->branch_id ?? auth()->user()->branch_id)
+            ->dehydrated(true);
 
         $components[] = Forms\Components\Hidden::make('status')
-            ->default('in_progress');
+            ->default('in_progress')
+            ->dehydrated(true);
 
         // Build all sections
         foreach ($schema->schema['sections'] ?? [] as $section) {
-            $sectionComponent = self::buildSection($section, $schema);
+            $sectionComponent = $instance->buildSection($section, $schema);
             if ($sectionComponent) {
                 $components[] = $sectionComponent;
             }
@@ -38,12 +90,12 @@ class DynamicFormBuilder
     /**
      * Build a section
      */
-    protected static function buildSection(array $sectionConfig, AssessmentFormSchema $schema): ?Forms\Components\Section
+    protected function buildSection(array $sectionConfig, AssessmentFormSchema $schema): ?Forms\Components\Section
     {
         $fields = [];
 
         foreach ($sectionConfig['fields'] ?? [] as $fieldConfig) {
-            $field = self::buildField($fieldConfig, $schema);
+            $field = $this->buildField($fieldConfig, $schema);
             if ($field) {
                 $fields[] = $field;
             }
@@ -74,35 +126,28 @@ class DynamicFormBuilder
             $section->collapsed();
         }
 
-        // Apply conditional display for section
-        if (isset($sectionConfig['conditionalDisplay'])) {
-            $section->visible(function (Get $get, $record) use ($sectionConfig) {
-                return self::evaluateConditional($get, $sectionConfig['conditionalDisplay'], $record);
-            });
-        }
-
         return $section;
     }
 
     /**
      * Build a field based on type
      */
-    protected static function buildField(array $fieldConfig, AssessmentFormSchema $schema)
+    protected function buildField(array $fieldConfig, AssessmentFormSchema $schema)
     {
         $fieldType = $fieldConfig['type'] ?? 'text';
         $fieldId = 'response_data.' . ($fieldConfig['id'] ?? Str::random(8));
 
         $component = match($fieldType) {
-            'text' => self::buildTextField($fieldId, $fieldConfig),
-            'textarea' => self::buildTextareaField($fieldId, $fieldConfig),
-            'select' => self::buildSelectField($fieldId, $fieldConfig),
-            'checkbox_list' => self::buildCheckboxListField($fieldId, $fieldConfig),
-            'radio' => self::buildRadioField($fieldId, $fieldConfig),
-            'toggle' => self::buildToggleField($fieldId, $fieldConfig),
-            'date' => self::buildDateField($fieldId, $fieldConfig),
-            'file' => self::buildFileField($fieldId, $fieldConfig),
-            'placeholder' => self::buildPlaceholderField($fieldId, $fieldConfig),
-            'repeater' => self::buildRepeaterField($fieldId, $fieldConfig, $schema),
+            'text' => $this->buildTextField($fieldId, $fieldConfig),
+            'textarea' => $this->buildTextareaField($fieldId, $fieldConfig),
+            'select' => $this->buildSelectField($fieldId, $fieldConfig),
+            'checkbox_list' => $this->buildCheckboxListField($fieldId, $fieldConfig),
+            'radio' => $this->buildRadioField($fieldId, $fieldConfig),
+            'toggle' => $this->buildToggleField($fieldId, $fieldConfig),
+            'date' => $this->buildDateField($fieldId, $fieldConfig),
+            'file' => $this->buildFileField($fieldId, $fieldConfig),
+            'placeholder' => $this->buildPlaceholderField($fieldId, $fieldConfig),
+            'repeater' => $this->buildRepeaterField($fieldId, $fieldConfig, $schema),
             default => null,
         };
 
@@ -111,7 +156,7 @@ class DynamicFormBuilder
         }
 
         // Apply common configurations
-        self::applyCommonConfig($component, $fieldConfig);
+        $this->applyCommonConfig($component, $fieldConfig);
 
         return $component;
     }
@@ -119,7 +164,7 @@ class DynamicFormBuilder
     /**
      * Build text input field
      */
-    protected static function buildTextField(string $fieldId, array $config)
+    protected function buildTextField(string $fieldId, array $config)
     {
         $field = Forms\Components\TextInput::make($fieldId)
             ->label($config['label'] ?? 'Field');
@@ -148,7 +193,7 @@ class DynamicFormBuilder
     /**
      * Build textarea field
      */
-    protected static function buildTextareaField(string $fieldId, array $config)
+    protected function buildTextareaField(string $fieldId, array $config)
     {
         return Forms\Components\Textarea::make($fieldId)
             ->label($config['label'] ?? 'Field')
@@ -158,15 +203,22 @@ class DynamicFormBuilder
     }
 
     /**
-     * Build select field
+     * Build select field with cascading support
      */
-    protected static function buildSelectField(string $fieldId, array $config)
+    protected function buildSelectField(string $fieldId, array $config)
     {
         $field = Forms\Components\Select::make($fieldId)
             ->label($config['label'] ?? 'Field')
-            ->options(self::getOptions($config))
             ->searchable($config['searchable'] ?? false)
             ->native(false);
+
+        // Handle data source (models)
+        if (isset($config['dataSource'])) {
+            $this->applyDataSource($field, $config['dataSource'], $fieldId);
+        } else {
+            // Static options
+            $field->options($this->getOptions($config));
+        }
 
         if (isset($config['default'])) {
             $field->default($config['default']);
@@ -176,57 +228,151 @@ class DynamicFormBuilder
             $field->multiple();
         }
 
+        // Live for cascading
+        if ($config['live'] ?? false) {
+            $field->live(onBlur: false);
+            
+            // Handle reset actions for cascading
+            if (isset($config['onChangeActions'])) {
+                $field->afterStateUpdated(function (Set $set) use ($config) {
+                    foreach ($config['onChangeActions'] as $action) {
+                        if ($action['action'] === 'reset') {
+                            $set('response_data.' . $action['target'], null);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Disabled state for cascading
+        if (isset($config['disabled']) && str_contains($config['disabled'], 'if')) {
+            // Extract the condition: "if county_id == null"
+            preg_match('/if\s+(\w+)\s+==\s+null/', $config['disabled'], $matches);
+            if (!empty($matches[1])) {
+                $dependsOn = $matches[1];
+                $field->disabled(fn (Get $get) => empty($get('response_data.' . $dependsOn)));
+            }
+        }
+
         return $field;
+    }
+
+    /**
+     * Apply data source to select field (for County, Sub-County, Ward, Service)
+     */
+    protected function applyDataSource(Forms\Components\Select $field, array $dataSource, string $fieldId)
+    {
+        $modelClass = 'App\\Models\\' . $dataSource['model'];
+        
+        // Check if model exists
+        if (!class_exists($modelClass)) {
+            return;
+        }
+        
+        // Check if it needs filtering (cascading)
+        if (isset($dataSource['filterBy']) && is_array($dataSource['filterBy'])) {
+            // Validate filterBy has required keys
+            if (!isset($dataSource['filterBy']['field']) || !isset($dataSource['filterBy']['sourceField'])) {
+                // Invalid filterBy config, load all records instead
+                $field->options(
+                    $modelClass::pluck($dataSource['labelField'] ?? 'name', $dataSource['valueField'] ?? 'id')->toArray()
+                );
+                return;
+            }
+            
+            $filterDbField = $dataSource['filterBy']['field'];  // DB column name (e.g., 'county_id')
+            $filterSourceField = $dataSource['filterBy']['sourceField'];  // Form field name (e.g., 'county_id')
+            
+            $field->options(function (Get $get) use ($modelClass, $dataSource, $filterDbField, $filterSourceField) {
+                $filterValue = $get('response_data.' . $filterSourceField);
+                
+                if (empty($filterValue)) {
+                    return [];
+                }
+                
+                try {
+                    return $modelClass::where($filterDbField, $filterValue)
+                        ->pluck($dataSource['labelField'] ?? 'name', $dataSource['valueField'] ?? 'id')
+                        ->toArray();
+                } catch (\Exception $e) {
+                    // Log error but don't break the form
+                    logger()->error('DynamicFormBuilder dataSource error: ' . $e->getMessage());
+                    return [];
+                }
+            });
+        } else {
+            // No filtering - load all
+            try {
+                $field->options(
+                    $modelClass::pluck($dataSource['labelField'] ?? 'name', $dataSource['valueField'] ?? 'id')->toArray()
+                );
+            } catch (\Exception $e) {
+                logger()->error('DynamicFormBuilder dataSource error: ' . $e->getMessage());
+                $field->options([]);
+            }
+        }
     }
 
     /**
      * Build checkbox list field
      */
-    protected static function buildCheckboxListField(string $fieldId, array $config)
+    protected function buildCheckboxListField(string $fieldId, array $config)
     {
-        return Forms\Components\CheckboxList::make($fieldId)
+        $field = Forms\Components\CheckboxList::make($fieldId)
             ->label($config['label'] ?? 'Field')
-            ->options(self::getOptions($config))
+            ->options($this->getOptions($config))
             ->columns($config['columns'] ?? 1);
+
+        if ($config['live'] ?? false) {
+            $field->live();
+        }
+
+        return $field;
     }
 
     /**
      * Build radio field
      */
-    protected static function buildRadioField(string $fieldId, array $config)
+    protected function buildRadioField(string $fieldId, array $config)
     {
         return Forms\Components\Radio::make($fieldId)
             ->label($config['label'] ?? 'Field')
-            ->options(self::getOptions($config))
+            ->options($this->getOptions($config))
             ->inline($config['inline'] ?? false);
     }
 
     /**
      * Build toggle field
      */
-    protected static function buildToggleField(string $fieldId, array $config)
+    protected function buildToggleField(string $fieldId, array $config)
     {
-        return Forms\Components\Toggle::make($fieldId)
-            ->label($config['label'] ?? 'Field')
-            ->default($config['default'] ?? false)
-            ->inline($config['inline'] ?? true);
+        $field = Forms\Components\Toggle::make($fieldId)
+            ->label($config['label'] ?? 'Field');
+
+        if (isset($config['default'])) {
+            $field->default($config['default']);
+        }
+
+        if ($config['live'] ?? false) {
+            $field->live();
+        }
+
+        return $field;
     }
 
     /**
      * Build date field
      */
-    protected static function buildDateField(string $fieldId, array $config)
+    protected function buildDateField(string $fieldId, array $config)
     {
         $field = Forms\Components\DatePicker::make($fieldId)
             ->label($config['label'] ?? 'Field')
             ->native(false);
 
         if (isset($config['minDate'])) {
-            $field->minDate($config['minDate']);
-        }
-
-        if (isset($config['maxDate'])) {
-            $field->maxDate($config['maxDate']);
+            if ($config['minDate'] === 'today') {
+                $field->minDate(now());
+            }
         }
 
         return $field;
@@ -235,73 +381,180 @@ class DynamicFormBuilder
     /**
      * Build file upload field
      */
-    protected static function buildFileField(string $fieldId, array $config)
+    protected function buildFileField(string $fieldId, array $config)
     {
         $field = Forms\Components\FileUpload::make($fieldId)
             ->label($config['label'] ?? 'Field')
-            ->multiple($config['multiple'] ?? false)
-            ->directory($config['directory'] ?? 'form-uploads');
+            ->directory($config['directory'] ?? 'uploads')
+            ->multiple($config['multiple'] ?? false);
 
         if (isset($config['acceptedFileTypes'])) {
             $field->acceptedFileTypes($config['acceptedFileTypes']);
-        }
-
-        if (isset($config['image']) && $config['image']) {
-            $field->image();
         }
 
         return $field;
     }
 
     /**
-     * Build placeholder field
+     * Build placeholder field (auto-loaded from visit/client)
      */
-    protected static function buildPlaceholderField(string $fieldId, array $config)
+    protected function buildPlaceholderField(string $fieldId, array $config)
     {
+        $value = $this->getPlaceholderValue($config['id']);
+        
         return Forms\Components\Placeholder::make($fieldId)
-            ->label($config['label'] ?? '')
-            ->content($config['content'] ?? '');
+            ->label($config['label'] ?? 'Field')
+            ->content(new HtmlString(
+                '<div class="text-sm font-medium text-gray-900 dark:text-white">' . 
+                e($value) . 
+                '</div>'
+            ));
+    }
+
+    /**
+     * Get placeholder value from visit/client
+     */
+    protected function getPlaceholderValue(string $fieldId): string
+    {
+        if (!$this->visit || !$this->client) {
+            return 'N/A';
+        }
+
+        return match($fieldId) {
+            'client_uci' => $this->client->uci ?? 'N/A',
+            'client_name' => $this->client->full_name ?? 'N/A',
+            'client_age' => $this->client->age ? $this->client->age . ' years' : 'N/A',
+            'client_gender' => $this->client->sex ? ucfirst($this->client->sex) : 'N/A',
+            'visit_number' => $this->visit->visit_number ?? 'N/A',
+            'triage_status' => $this->visit->triage 
+                ? ucfirst($this->visit->triage->risk_level ?? 'Assessed') 
+                : 'Not triaged',
+            'triage_vitals' => $this->getTriageVitals(),
+            'triage_link' => $this->getTriageLink(),
+            default => 'N/A',
+        };
+    }
+
+    /**
+     * Get formatted triage vitals
+     */
+    protected function getTriageVitals(): string
+    {
+        if (!$this->visit || !$this->visit->triage) {
+            return 'N/A';
+        }
+
+        $triage = $this->visit->triage;
+        $vitals = [];
+
+        if ($triage->blood_pressure_systolic && $triage->blood_pressure_diastolic) {
+            $vitals[] = 'BP: ' . $triage->blood_pressure_systolic . '/' . $triage->blood_pressure_diastolic;
+        }
+
+        if ($triage->temperature) {
+            $vitals[] = 'Temp: ' . $triage->temperature . '°C';
+        }
+
+        if ($triage->heart_rate) {
+            $vitals[] = 'HR: ' . $triage->heart_rate;
+        }
+
+        if ($triage->oxygen_saturation) {
+            $vitals[] = 'O2: ' . $triage->oxygen_saturation . '%';
+        }
+
+        return !empty($vitals) ? implode(' | ', $vitals) : 'N/A';
+    }
+
+    /**
+     * Get triage link
+     */
+    protected function getTriageLink(): string
+    {
+        if (!$this->visit || !$this->visit->triage) {
+            return 'No triage record';
+        }
+
+        $triageId = $this->visit->triage->id;
+        $url = "/admin/triages/{$triageId}";
+        
+        return "<a href='{$url}' target='_blank' class='text-primary-600 hover:text-primary-700 underline font-semibold'>
+            View Triage Assessment →
+        </a>";
     }
 
     /**
      * Build repeater field
      */
-    protected static function buildRepeaterField(string $fieldId, array $config, AssessmentFormSchema $schema)
+    protected function buildRepeaterField(string $fieldId, array $config, AssessmentFormSchema $schema)
     {
         $subFields = [];
+        
         foreach ($config['fields'] ?? [] as $subFieldConfig) {
-            $subField = self::buildField($subFieldConfig, $schema);
+            $subField = $this->buildField($subFieldConfig, $schema);
             if ($subField) {
                 $subFields[] = $subField;
             }
         }
 
-        return Forms\Components\Repeater::make($fieldId)
+        $repeater = Forms\Components\Repeater::make($fieldId)
             ->label($config['label'] ?? 'Field')
-            ->schema($subFields)
-            ->columns($config['columns'] ?? 1)
-            ->collapsible($config['collapsible'] ?? false)
-            ->defaultItems($config['defaultItems'] ?? 0)
-            ->addActionLabel($config['addActionLabel'] ?? 'Add item');
+            ->schema($subFields);
+
+        if ($config['collapsible'] ?? false) {
+            $repeater->collapsible();
+        }
+
+        if (isset($config['defaultItems'])) {
+            $repeater->defaultItems($config['defaultItems']);
+        }
+
+        return $repeater;
     }
 
     /**
-     * Apply common configuration to all fields
+     * Get options for select/radio/checkbox fields
      */
-    protected static function applyCommonConfig($component, array $config): void
+    protected function getOptions(array $config): array
     {
+        if (isset($config['options'])) {
+            $options = [];
+            foreach ($config['options'] as $option) {
+                $options[$option['value']] = $option['label'];
+            }
+            return $options;
+        }
+
+        return [];
+    }
+
+    /**
+     * Apply common configurations to field
+     */
+    protected function applyCommonConfig($component, array $config): void
+    {
+        // Required validation
+        if (($config['validation']['required'] ?? false) === true) {
+            $component->required();
+        }
+
+        // Validation rules
+        if (isset($config['validation']['rules'])) {
+            foreach ($config['validation']['rules'] as $rule) {
+                if (is_string($rule) && str_starts_with($rule, 'regex:')) {
+                    $component->rule($rule);
+                }
+            }
+        }
+
         // Helper text
         if (isset($config['helperText'])) {
             $component->helperText($config['helperText']);
         }
 
-        // Prefix/Suffix icons
+        // Prefix icon
         if (isset($config['prefixIcon'])) {
             $component->prefixIcon($config['prefixIcon']);
-        }
-
-        if (isset($config['suffixIcon'])) {
-            $component->suffixIcon($config['suffixIcon']);
         }
 
         // Column span
@@ -309,141 +562,47 @@ class DynamicFormBuilder
             $component->columnSpan($config['columnSpan']);
         }
 
-        // Validation
-        if (isset($config['validation'])) {
-            $validation = $config['validation'];
-            
-            if ($validation['required'] ?? false) {
-                $component->required();
-            }
-
-            if (isset($validation['rules'])) {
-                foreach ($validation['rules'] as $rule) {
-                    $component->rule($rule);
-                }
-            }
-        }
-
         // Conditional display
         if (isset($config['conditionalDisplay'])) {
-            $component->visible(function (Get $get, $record) use ($config) {
-                return self::evaluateConditional($get, $config['conditionalDisplay'], $record);
-            });
-        }
-
-        // Disabled state
-        if (isset($config['disabled'])) {
-            if (is_bool($config['disabled'])) {
-                $component->disabled($config['disabled']);
-            } else {
-                // Dynamic disabled logic
-                $component->disabled(function (Get $get, $record) use ($config) {
-                    return self::evaluateConditional($get, ['logic' => $config['disabled']], $record);
-                });
-            }
-        }
-
-        // Live updates
-        if ($config['live'] ?? false) {
-            $component->live();
-        }
-
-        // On change actions
-        if (isset($config['onChangeActions'])) {
-            $component->afterStateUpdated(function (Set $set, $state) use ($config) {
-                foreach ($config['onChangeActions'] as $action) {
-                    if ($action['action'] === 'reset') {
-                        $set($action['target'], null);
-                    }
-                }
-            });
+            $this->applyConditionalDisplay($component, $config['conditionalDisplay']);
         }
     }
 
     /**
-     * Get options for select/checkbox fields
+     * Apply conditional display logic
      */
-    protected static function getOptions(array $config): array
+    protected function applyConditionalDisplay($component, array $condition): void
     {
-        // Static options
-        if (isset($config['options'])) {
-            return collect($config['options'])->pluck('label', 'value')->toArray();
+        // Validate required keys exist
+        if (!isset($condition['field']) || !isset($condition['operator'])) {
+            // Invalid condition - make field always visible
+            return;
         }
+        
+        $sourceField = 'response_data.' . $condition['field'];
+        $operator = $condition['operator'];
+        $value = $condition['value'] ?? null;
 
-        // Dynamic options from database
-        if (isset($config['dataSource'])) {
-            $dataSource = $config['dataSource'];
-            $modelClass = "App\\Models\\{$dataSource['model']}";
-            
-            if (!class_exists($modelClass)) {
-                return [];
+        $component->visible(function (Get $get) use ($sourceField, $operator, $value) {
+            $fieldValue = $get($sourceField);
+
+            try {
+                return match($operator) {
+                    'equals' => $fieldValue == $value,
+                    'not_equals' => $fieldValue != $value,
+                    'contains' => is_array($fieldValue) && in_array($value, $fieldValue),
+                    'not_contains' => is_array($fieldValue) && !in_array($value, $fieldValue),
+                    'in' => is_array($value) && in_array($fieldValue, $value),
+                    'not_in' => is_array($value) && !in_array($fieldValue, $value),
+                    'greater_than' => is_numeric($fieldValue) && is_numeric($value) && $fieldValue > $value,
+                    'less_than' => is_numeric($fieldValue) && is_numeric($value) && $fieldValue < $value,
+                    default => true,  // Unknown operator - show field
+                };
+            } catch (\Exception $e) {
+                // Log error but don't break the form
+                logger()->error('DynamicFormBuilder conditional display error: ' . $e->getMessage());
+                return true;  // Show field on error
             }
-
-            $query = $modelClass::query();
-            
-            // Apply filters (simplified - in production, handle Get context properly)
-            if (isset($dataSource['filterBy'])) {
-                // Would need proper context handling here
-            }
-
-            return $query->pluck($dataSource['labelField'], $dataSource['valueField'])->toArray();
-        }
-
-        return [];
-    }
-
-    /**
-     * Evaluate conditional logic
-     */
-    protected static function evaluateConditional(Get $get, array $condition, $record = null): bool
-    {
-        // Simple string logic (e.g., "if county_id == null")
-        if (isset($condition['logic'])) {
-            // Parse simple conditions
-            // In production, use a proper expression evaluator
-            return true; // Simplified
-        }
-
-        // Field-based conditions
-        if (isset($condition['field'])) {
-            $fieldPath = 'response_data.' . $condition['field'];
-            $fieldValue = $get($fieldPath);
-            $operator = $condition['operator'] ?? 'equals';
-            $compareValue = $condition['value'] ?? null;
-
-            return match($operator) {
-                'equals' => $fieldValue == $compareValue,
-                'not_equals' => $fieldValue != $compareValue,
-                'contains' => is_array($fieldValue) && in_array($compareValue, $fieldValue),
-                'not_contains' => is_array($fieldValue) && !in_array($compareValue, $fieldValue),
-                'greater_than' => $fieldValue > $compareValue,
-                'less_than' => $fieldValue < $compareValue,
-                'is_empty' => empty($fieldValue),
-                'is_not_empty' => !empty($fieldValue),
-                default => true,
-            };
-        }
-
-        // Age-based conditions
-        if (isset($condition['ageCondition'])) {
-            if (!$record || !$record->client) {
-                return true;
-            }
-            
-            $age = $record->client->estimated_age ?? 0;
-            $condition = $condition['ageCondition'];
-            
-            if (isset($condition['min']) && $age < $condition['min']) {
-                return false;
-            }
-            
-            if (isset($condition['max']) && $age > $condition['max']) {
-                return false;
-            }
-            
-            return true;
-        }
-
-        return true;
+        });
     }
 }

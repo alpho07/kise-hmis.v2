@@ -5,6 +5,7 @@ namespace App\Models;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -45,6 +46,23 @@ class User extends Authenticatable implements FilamentUser
             'is_active' => 'boolean',
         ];
     }
+
+    /**
+ * Get service requests created by this user
+ */
+public function serviceRequests(): HasMany
+{
+    return $this->hasMany(ServiceRequest::class, 'requested_by');
+}
+
+/**
+ * Get service requests created today
+ */
+public function todayServiceRequests()
+{
+    return $this->serviceRequests()
+        ->whereDate('created_at', today());
+}
 
     /**
      * Determine if user can access Filament panel

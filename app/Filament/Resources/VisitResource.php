@@ -227,7 +227,7 @@ class VisitResource extends Resource
                     ->icon('heroicon-o-document-text')
                     ->color('warning')
                     ->visible(fn ($record) => $record->current_stage === 'billing' && !$record->invoices()->exists())
-                    ->url(fn ($record) => route('filament.admin.resources.invoices.create', ['visit' => $record->id]))
+                    //->url(fn ($record) => route('filament.admin.resources.invoices.create', ['visit' => $record->id]))
                     ->button(),
 
                 Tables\Actions\Action::make('view_invoice')

@@ -29,6 +29,7 @@ class ServiceBooking extends Model
         'payment_status',
         'service_status',
         'assigned_provider_id',
+        'source',
         'notes',
         'status',
         'insurance_provider_id',
@@ -63,6 +64,34 @@ class ServiceBooking extends Model
             }
         });
     }
+
+    /**
+ * Get the service request that created this booking (if any)
+ */
+public function serviceRequest(): HasOne
+{
+    return $this->hasOne(ServiceRequest::class);
+}
+
+/**
+ * Check if booking was created from service request
+ */
+public function isFromServiceRequest(): bool
+{
+    return $this->serviceRequest()->exists();
+}
+
+/**
+ * Get the origin of this booking
+ */
+public function getOriginAttribute(): string
+{
+    if ($this->isFromServiceRequest()) {
+        return 'service_request';
+    }
+    // Add other origin checks as needed
+    return 'intake';
+}
 
     /**
      * Get the visit

@@ -19,7 +19,7 @@ class Visit extends Model
         'client_id',
         'branch_id',
         'visit_number',
-        'visit_type',
+        'visit_type', // 'walk_in', 'appointment', 'follow_up'
         'visit_date',
         'visit_purpose',
         'referral_source',
@@ -30,27 +30,29 @@ class Visit extends Model
         'current_stage',
         'status',
         'checked_in_by',
-        
         // Service Availability
         'service_available',
         'unavailability_reason',
         'unavailability_notes',
-
         // Flags
         'is_emergency',
         'requires_followup',
-
         // Notes
         'purpose_notes',
+        // Queue & Payment
+        'queue_number',
+        'payment_verified_at',
+        'payment_status', // 'pending', 'partial', 'paid'
     ];
 
     protected $casts = [
         'check_in_time' => 'datetime',
         'check_out_time' => 'datetime',
         'is_appointment' => 'boolean',
+        'service_available' => 'boolean',
         'is_emergency' => 'boolean',
         'requires_followup' => 'boolean',
-        'service_available' => 'boolean',
+        'payment_verified_at' => 'datetime',
     ];
 
     /**
@@ -62,7 +64,12 @@ class Visit extends Model
 
         static::creating(function ($visit) {
             if (!$visit->visit_number) {
-                $visit->visit_number = 'VST-' . date('Ymd') . '-' . str_pad(Visit::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT);
+                $visit->visit_number = 'VST-' . date('Ymd') . '-' . str_pad(
+                    Visit::whereDate('created_at', today())->count() + 1, 
+                    4, 
+                    '0', 
+                    STR_PAD_LEFT
+                );
             }
             if (!$visit->check_in_time) {
                 $visit->check_in_time = now();
@@ -73,15 +80,22 @@ class Visit extends Model
             if (!$visit->status) {
                 $visit->status = 'in_progress';
             }
+            if (!$visit->payment_status) {
+                $visit->payment_status = 'pending';
+            }
         });
     }
+
+    // ==========================================
+    // CORE RELATIONSHIPS
+    // ==========================================
 
     /**
      * Get the client
      */
     public function client(): BelongsTo
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(Client::class, 'client_id');
     }
 
     /**
@@ -89,7 +103,7 @@ class Visit extends Model
      */
     public function branch(): BelongsTo
     {
-        return $this->belongsTo(Branch::class);
+        return $this->belongsTo(Branch::class, 'branch_id');
     }
 
     /**
@@ -99,6 +113,26 @@ class Visit extends Model
     {
         return $this->belongsTo(User::class, 'checked_in_by');
     }
+
+
+/**
+ * Get active service requests
+ */
+public function activeServiceRequests()
+{
+    return $this->serviceRequests()
+        ->whereNotIn('status', ['completed', 'cancelled']);
+}
+
+/**
+ * Check if visit has pending service requests
+ */
+public function hasPendingServiceRequests(): bool
+{
+    return $this->serviceRequests()
+        ->where('status', 'pending_payment')
+        ->exists();
+}
 
     /**
      * Get all visit stages
@@ -113,7 +147,7 @@ class Visit extends Model
      */
     public function triage(): HasOne
     {
-        return $this->hasOne(Triage::class);
+        return $this->hasOne(Triage::class, 'visit_id');
     }
 
     /**
@@ -121,31 +155,43 @@ class Visit extends Model
      */
     public function intakeAssessment(): HasOne
     {
-        return $this->hasOne(IntakeAssessment::class);
+        return $this->hasOne(IntakeAssessment::class, 'visit_id');
     }
 
     /**
-     * Get all service bookings
+     * Get functional screening
+     */
+    public function functionalScreening(): HasOne
+    {
+        return $this->hasOne(FunctionalScreening::class, 'visit_id');
+    }
+
+    // ==========================================
+    // SERVICE & APPOINTMENT RELATIONSHIPS
+    // ==========================================
+
+    /**
+     * Get all service bookings for this visit
      */
     public function serviceBookings(): HasMany
     {
-        return $this->hasMany(ServiceBooking::class);
+        return $this->hasMany(ServiceBooking::class, 'visit_id');
     }
 
     /**
-     * Get all invoices
+     * ✅ NEW: Get all service requests (mid-journey additions)
      */
-    public function invoices(): HasMany
+    public function serviceRequests(): HasMany
     {
-        return $this->hasMany(Invoice::class);
+        return $this->hasMany(ServiceRequest::class, 'visit_id');
     }
 
     /**
-     * Get all queue entries
+     * ✅ NEW: Get appointment if this visit is from an appointment
      */
-    public function queueEntries(): HasMany
+    public function appointment(): HasOne
     {
-        return $this->hasMany(QueueEntry::class);
+        return $this->hasOne(Appointment::class, 'visit_id');
     }
 
     /**
@@ -153,158 +199,77 @@ class Visit extends Model
      */
     public function serviceSessions(): HasMany
     {
-        return $this->hasMany(ServiceSession::class);
+        return $this->hasMany(ServiceSession::class, 'visit_id');
     }
 
     /**
-     * Get medical holds
+     * Get all queue entries for this visit
      */
-    public function medicalHolds(): HasMany
+    public function queueEntries(): HasMany
     {
-        return $this->hasMany(MedicalHold::class);
+        return $this->hasMany(QueueEntry::class, 'visit_id');
     }
 
+    // ==========================================
+    // REFERRAL RELATIONSHIPS
+    // ==========================================
+
     /**
-     * Get crisis incidents
+     * ✅ NEW: Get internal referrals created during this visit
      */
-    public function crisisIncidents(): HasMany
+    public function internalReferrals(): HasMany
     {
-        return $this->hasMany(CrisisIncident::class);
+        return $this->hasMany(InternalReferral::class, 'visit_id');
     }
 
     /**
-     * ================================================================
-     * NEW TRIAGE VERIFICATION METHODS (Phase 1)
-     * ================================================================
+     * ✅ NEW: Get external referrals created during this visit
      */
-
-    /**
-     * Check if visit has valid triage clearance
-     */
-    public function hasValidTriage(): bool
+    public function externalReferrals(): HasMany
     {
-        $triage = $this->currentTriage();
-        return $triage && $triage->isClearedForService();
+        return $this->hasMany(ExternalReferral::class, 'visit_id');
     }
 
+    // ==========================================
+    // PAYMENT & BILLING RELATIONSHIPS
+    // ==========================================
+
     /**
-     * Get current triage (non-expired)
+     * Get all invoices (plural)
      */
-    public function currentTriage(): ?Triage
+    public function invoices(): HasMany
     {
-        return $this->triage()
-            ->where('is_expired', false)
-            ->latest()
-            ->first();
+        return $this->hasMany(Invoice::class, 'visit_id');
     }
 
     /**
-     * Check if visit has medical hold
+     * Get the primary/current invoice (singular)
+     * For cashier queue - gets the most recent unpaid invoice
      */
-    public function hasMedicalHold(): bool
+    public function invoice(): HasOne
     {
-        $triage = $this->currentTriage();
-        return $triage && $triage->hasMedicalHold();
+        return $this->hasOne(Invoice::class, 'visit_id')->latestOfMany();
     }
 
     /**
-     * Check if crisis protocol is active
+     * Get all payments for this visit
      */
-    public function hasCrisisProtocol(): bool
+    public function payments(): HasMany
     {
-        $triage = $this->currentTriage();
-        return $triage && $triage->isCrisis();
+        return $this->hasMany(Payment::class, 'visit_id');
     }
 
     /**
-     * Check if active medical hold exists
+     * Get insurance claims through invoices
      */
-    public function hasActiveMedicalHold(): bool
+    public function insuranceClaims(): HasMany
     {
-        return $this->medicalHolds()
-            ->where('status', 'active')
-            ->exists();
+        return $this->hasMany(InsuranceClaim::class, 'visit_id');
     }
 
-    /**
-     * Block service access if not triaged or has holds
-     * 
-     * This is the CRITICAL safety check
-     */
-    public function canProceedToService(): bool
-    {
-        // Must have valid triage
-        if (!$this->hasValidTriage()) {
-            return false;
-        }
-        
-        // Cannot have medical hold
-        if ($this->hasMedicalHold() || $this->hasActiveMedicalHold()) {
-            return false;
-        }
-        
-        // Cannot have crisis protocol
-        if ($this->hasCrisisProtocol()) {
-            return false;
-        }
-        
-        return true;
-    }
-
-    /**
-     * Get blocking reason (for user feedback)
-     */
-    public function getServiceBlockReason(): ?string
-    {
-        if (!$this->triage()->exists()) {
-            return 'No triage assessment completed';
-        }
-
-        $triage = $this->currentTriage();
-        
-        if (!$triage) {
-            return 'Triage has expired - reassessment required';
-        }
-
-        if ($triage->hasMedicalHold()) {
-            return 'Medical hold active - clearance required';
-        }
-
-        if ($triage->isCrisis()) {
-            return 'Crisis protocol active - immediate intervention required';
-        }
-
-        if ($this->hasActiveMedicalHold()) {
-            return 'Active medical hold pending clearance';
-        }
-
-        return null;
-    }
-
-    /**
-     * Get triage priority for queue ordering
-     */
-    public function getTriagePriority(): string
-    {
-        $triage = $this->currentTriage();
-        return $triage ? $triage->getQueuePriority() : 'normal';
-    }
-
-    /**
-     * Check if triage is required for this visit type
-     */
-    public function requiresTriage(): bool
-    {
-        // All visits require triage except follow-up appointments for stable clients
-        // This logic can be customized based on business rules
-        return true;
-    }
-
-    /**
-     * ================================================================
-     * EXISTING METHODS (Keep as-is)
-     * ================================================================
-     */
+    // ==========================================
+    // HELPER METHODS
+    // ==========================================
 
     /**
      * Move to next stage
@@ -326,7 +291,11 @@ class Visit extends Model
      */
     public function completeStage(): void
     {
-        $currentStage = $this->stages()->where('stage', $this->current_stage)->latest()->first();
+        $currentStage = $this->stages()
+            ->where('stage', $this->current_stage)
+            ->latest()
+            ->first();
+            
         if ($currentStage) {
             $currentStage->update([
                 'completed_at' => now(),
@@ -343,8 +312,96 @@ class Visit extends Model
         $this->update([
             'check_out_time' => now(),
             'status' => 'completed',
+            'current_stage' => 'completed',
         ]);
     }
+
+    /**
+     * ✅ NEW: Calculate total amount for this visit
+     * Includes both initial services and mid-journey requests
+     */
+    public function calculateTotalAmount(): float
+    {
+        // Initial service bookings
+        $servicesTotal = $this->serviceBookings()
+            ->where('payment_status', '!=', 'paid')
+            ->sum('total_cost');
+        
+        // Mid-journey service requests (pending payment)
+        $requestsTotal = $this->serviceRequests()
+            ->where('status', 'pending_payment')
+            ->sum('cost');
+        
+        return $servicesTotal + $requestsTotal;
+    }
+
+    /**
+     * ✅ NEW: Get all unpaid services (initial + mid-journey)
+     */
+    public function getUnpaidServicesAttribute()
+    {
+        $services = collect();
+        
+        // Add unpaid service bookings
+        $services = $services->merge(
+            $this->serviceBookings()
+                ->where('payment_status', '!=', 'paid')
+                ->with('service')
+                ->get()
+        );
+        
+        // Add pending service requests
+        $pendingRequests = $this->serviceRequests()
+            ->where('status', 'pending_payment')
+            ->with('service')
+            ->get();
+        
+        return [
+            'bookings' => $this->serviceBookings()->where('payment_status', '!=', 'paid')->get(),
+            'requests' => $pendingRequests,
+            'total' => $this->calculateTotalAmount(),
+        ];
+    }
+
+    /**
+     * ✅ NEW: Check if all services are completed
+     */
+    public function allServicesCompleted(): bool
+    {
+        // Check service bookings
+        $incompleteBookings = $this->serviceBookings()
+            ->whereNotIn('service_status', ['completed', 'no_show'])
+            ->count();
+        
+        // Check queue entries
+        $incompleteQueue = $this->queueEntries()
+            ->whereNotIn('status', ['completed', 'no_show'])
+            ->count();
+        
+        return $incompleteBookings === 0 && $incompleteQueue === 0;
+    }
+
+    /**
+     * ✅ NEW: Get service completion percentage
+     */
+    public function getServiceCompletionPercentage(): float
+    {
+        $totalServices = $this->serviceBookings()->count();
+        
+        if ($totalServices === 0) {
+            return 0;
+        }
+        
+        $completedServices = $this->serviceBookings()
+            ->where('service_status', 'completed')
+            ->count();
+        
+        return round(($completedServices / $totalServices) * 100, 2);
+    }
+
+    // ==========================================
+    // SCOPES
+    // ==========================================
 
     /**
      * Scope for in progress visits
@@ -371,38 +428,117 @@ class Visit extends Model
     }
 
     /**
-     * Scope for visits pending triage
+     * Scope for visits at a specific stage
      */
-    public function scopePendingTriage($query)
+    public function scopeAtStage($query, string $stage)
     {
-        return $query->whereDoesntHave('triage')
-            ->orWhereHas('triage', function ($q) {
-                $q->where('is_expired', true);
-            });
+        return $query->where('current_stage', $stage);
     }
 
     /**
-     * Scope for visits with medical holds
+     * Scope for visits with unpaid invoices
      */
-    public function scopeWithMedicalHold($query)
+    public function scopeWithUnpaidInvoice($query)
     {
-        return $query->whereHas('triage', function ($q) {
-            $q->where('clearance_status', 'medical_hold');
-        })->orWhereHas('medicalHolds', function ($q) {
-            $q->where('status', 'active');
+        return $query->whereHas('invoice', function ($q) {
+            $q->where('payment_status', '!=', 'paid');
         });
     }
 
     /**
-     * Scope for visits with crisis protocol
+     * ✅ NEW: Scope for visits with pending service requests
      */
-    public function scopeWithCrisisProtocol($query)
+    public function scopeWithPendingRequests($query)
     {
-        return $query->whereHas('triage', function ($q) {
-            $q->where('clearance_status', 'crisis_protocol')
-                ->orWhere('crisis_protocol_activated', true);
+        return $query->whereHas('serviceRequests', function ($q) {
+            $q->where('status', 'pending_payment');
         });
     }
+
+    /**
+     * ✅ NEW: Scope for appointment-based visits
+     */
+    public function scopeFromAppointment($query)
+    {
+        return $query->where('visit_type', 'appointment')
+            ->orWhereNotNull('is_appointment');
+    }
+
+    // ==========================================
+    // ATTRIBUTES & ACCESSORS
+    // ==========================================
+
+    /**
+     * Get total amount due for this visit
+     */
+    public function getTotalAmountDueAttribute(): float
+    {
+        return $this->invoice?->total_client_amount ?? 0;
+    }
+
+    /**
+     * Get total amount paid for this visit
+     */
+    public function getTotalAmountPaidAttribute(): float
+    {
+        return $this->invoice?->amount_paid ?? 0;
+    }
+
+    /**
+     * Get balance remaining
+     */
+    public function getBalanceAttribute(): float
+    {
+        return max(0, $this->total_amount_due - $this->total_amount_paid);
+    }
+
+    /**
+     * Check if payment is complete
+     */
+    public function isPaymentComplete(): bool
+    {
+        return $this->invoice && $this->invoice->payment_status === 'paid';
+    }
+
+    /**
+     * ✅ NEW: Check if visit has pending service requests
+     */
+    public function hasPendingRequests(): bool
+    {
+        return $this->serviceRequests()
+            ->where('status', 'pending_payment')
+            ->exists();
+    }
+
+    /**
+     * ✅ NEW: Get visit duration in minutes
+     */
+    public function getDurationAttribute(): ?int
+    {
+        if (!$this->check_out_time) {
+            return $this->check_in_time->diffInMinutes(now());
+        }
+        
+        return $this->check_in_time->diffInMinutes($this->check_out_time);
+    }
+
+    /**
+     * ✅ NEW: Get human-readable visit type
+     */
+    public function getVisitTypeDisplayAttribute(): string
+    {
+        return match($this->visit_type) {
+            'walk_in' => 'Walk-in',
+            'appointment' => 'Scheduled Appointment',
+            'follow_up' => 'Follow-up Visit',
+            'emergency' => 'Emergency',
+            default => ucfirst($this->visit_type ?? 'Unknown'),
+        };
+    }
+
+    // ==========================================
+    // ACTIVITY LOG
+    // ==========================================
 
     /**
      * Activity log options
@@ -410,7 +546,12 @@ class Visit extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['current_stage', 'status'])
+            ->logOnly([
+                'current_stage', 
+                'status', 
+                'payment_status',
+                'check_out_time',
+            ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
