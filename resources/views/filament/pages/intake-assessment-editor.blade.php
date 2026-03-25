@@ -99,18 +99,18 @@
                             @blur.capture="clearTimeout(saveTimer); saveTimer = setTimeout(() => $wire.saveSectionData(section), 1000)"
                             @change.capture="clearTimeout(saveTimer); saveTimer = setTimeout(() => $wire.saveSectionData(section), 1000)"
                         >
-                            @if($activeSection === 'B') {!! $this->sectionBForm !!}
-                            @elseif($activeSection === 'C') {!! $this->sectionCForm !!}
-                            @elseif($activeSection === 'D') {!! $this->sectionDForm !!}
-                            @elseif($activeSection === 'E') {!! $this->sectionEForm !!}
-                            @elseif($activeSection === 'F') {!! $this->sectionFForm !!}
-                            @elseif($activeSection === 'G') {!! $this->sectionGForm !!}
-                            @elseif($activeSection === 'H') {!! $this->sectionHForm !!}
-                            @elseif($activeSection === 'I') {!! $this->sectionIForm !!}
-                            @elseif($activeSection === 'J') {!! $this->sectionJForm !!}
-                            @elseif($activeSection === 'K') {!! $this->sectionKForm !!}
+                            @if($activeSection === 'B') {{ $this->sectionBForm }}
+                            @elseif($activeSection === 'C') {{ $this->sectionCForm }}
+                            @elseif($activeSection === 'D') {{ $this->sectionDForm }}
+                            @elseif($activeSection === 'E') {{ $this->sectionEForm }}
+                            @elseif($activeSection === 'F') {{ $this->sectionFForm }}
+                            @elseif($activeSection === 'G') {{ $this->sectionGForm }}
+                            @elseif($activeSection === 'H') {{ $this->sectionHForm }}
+                            @elseif($activeSection === 'I') {{ $this->sectionIForm }}
+                            @elseif($activeSection === 'J') {{ $this->sectionJForm }}
+                            @elseif($activeSection === 'K') {{ $this->sectionKForm }}
                             @elseif($activeSection === 'L')
-                                {!! $this->sectionLForm !!}
+                                {{ $this->sectionLForm }}
                                 @php
                                     $allComplete = !in_array('incomplete', $sectionStatus)
                                                && !in_array('in_progress', $sectionStatus);

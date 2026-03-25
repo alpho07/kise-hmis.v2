@@ -23,6 +23,7 @@ return new class extends Migration
             $table->text('family_medical_history')->nullable();
             $table->json('feeding_history')->nullable();
             $table->timestamps();
+            $table->softDeletes();
             
             $table->index('client_id');
         });

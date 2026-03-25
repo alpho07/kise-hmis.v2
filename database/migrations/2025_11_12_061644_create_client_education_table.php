@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('employer_name', 200)->nullable();
             $table->text('education_notes')->nullable();
             $table->timestamps();
+            $table->softDeletes();
             
             $table->index('client_id');
             $table->index('education_level');

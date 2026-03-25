@@ -75,8 +75,10 @@ return new class extends Migration
             $table->index('created_at', 'idx_branches_created');
         });
         
-        // Add table comment for documentation
-        \DB::statement("ALTER TABLE branches COMMENT = 'Multi-tenant branch management for KISE centers'");
+        // Add table comment for documentation (MySQL only)
+        if (\DB::getDriverName() === 'mysql') {
+            \DB::statement("ALTER TABLE branches COMMENT = 'Multi-tenant branch management for KISE centers'");
+        }
     }
 
     /**

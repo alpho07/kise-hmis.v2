@@ -20,7 +20,8 @@ return new class extends Migration
             $table->json('other_languages')->nullable();
             $table->text('socio_notes')->nullable();
             $table->timestamps();
-            
+            $table->softDeletes();
+
             $table->index('client_id');
             $table->index('marital_status');
             $table->index('living_arrangement');

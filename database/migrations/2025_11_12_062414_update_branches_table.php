@@ -9,6 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('branches', function (Blueprint $table) {
+            // Drop the composite index before dropping its columns (required by SQLite)
+            $table->dropIndex('idx_branches_location');
             $table->dropColumn(['county', 'sub_county']);
             
             $table->foreignId('county_id')->nullable()->after('address')->constrained()->nullOnDelete();

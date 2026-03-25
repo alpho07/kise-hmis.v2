@@ -31,7 +31,8 @@ return new class extends Migration
             $table->text('activities_daily_living_notes')->nullable();
             $table->text('overall_summary')->nullable();
             $table->timestamps();
-            
+            $table->softDeletes();
+
             $table->index('intake_assessment_id');
             $table->index('client_id');
         });
