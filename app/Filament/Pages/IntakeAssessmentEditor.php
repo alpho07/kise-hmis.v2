@@ -3,20 +3,21 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Resources\IntakeAssessmentResource;
-use App\Models\AssessmentAutoReferral;
 use App\Models\Client;
 use App\Models\ClientDisability;
 use App\Models\ClientEducation;
 use App\Models\ClientMedicalHistory;
 use App\Models\ClientSocioDemographic;
-use App\Models\Department;
 use App\Models\FunctionalScreening;
 use App\Models\IntakeAssessment;
+use App\Models\Visit;
+// Pre-imported for Task 5-9 save methods and finalize():
+use App\Models\AssessmentAutoReferral;
+use App\Models\Department;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Service;
 use App\Models\ServiceBooking;
-use App\Models\Visit;
 use Carbon\Carbon;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -85,6 +86,11 @@ class IntakeAssessmentEditor extends Page implements HasForms
         $client = $this->client;
         $visit  = $intake->visit;
         $sr     = $intake->services_required ?? [];
+
+        if (!$client) {
+            // Client not linked yet — leave section data empty
+            return;
+        }
 
         $this->sectionData['B'] = [
             'verification_mode'         => $intake->verification_mode,
@@ -179,6 +185,9 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'payment_notes'           => $sr['payment_notes'] ?? null,
         ];
 
+        // TODO: deferral_reason, deferral_notes, next_appointment_date do not yet exist on
+        // the visits table or intake_assessments table — they return null on initial load
+        // until the deferral migration is added (Task 8).
         $this->sectionData['K'] = [
             'defer_client'          => $visit->status === 'deferred',
             'deferral_reason'       => $visit->deferral_reason,
@@ -187,7 +196,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ];
 
         $this->sectionData['L'] = [
-            'assessment_summary' => $intake->intake_summary,
+            'assessment_summary' => $intake->assessment_summary,
             'recommendations'    => $intake->recommendations,
             'priority_level'     => $intake->priority_level,
             'data_verified'      => $intake->data_verified,
