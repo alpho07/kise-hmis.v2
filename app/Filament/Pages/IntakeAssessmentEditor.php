@@ -552,11 +552,77 @@ class IntakeAssessmentEditor extends Page implements HasForms
         );
         // NOTE: Auto-referrals from functional screening are created only in finalize()
     }
-    protected function saveSectionH(array $data): void {}
-    protected function saveSectionI(array $data): void {}
-    protected function saveSectionJ(array $data): void {}
-    protected function saveSectionK(array $data): void {}
-    protected function saveSectionL(array $data): void {}
+    protected function saveSectionH(array $data): void
+    {
+        $sources = $data['referral_source'] ?? [];
+        if (in_array('other', $sources, true) && !empty($data['referral_source_other'])) {
+            $sources = array_filter($sources, fn($v) => $v !== 'other');
+            $sources[] = 'other: ' . $data['referral_source_other'];
+        }
+        $sr = $this->intake->services_required ?? [];
+        $sr['referral_source']  = array_values($sources);
+        $sr['referral_contact'] = $data['referral_contact'] ?? null;
+        $this->intake->update([
+            'reason_for_visit'       => $data['reason_for_visit']       ?? null,
+            'current_concerns'       => $data['current_concerns']       ?? null,
+            'previous_interventions' => $data['previous_interventions'] ?? null,
+            'services_required'      => $sr,
+        ]);
+    }
+
+    protected function saveSectionI(array $data): void
+    {
+        $sr = $this->intake->services_required ?? [];
+        $sr['primary_service_id'] = $data['i_primary_service_id'] ?? null;
+        $sr['service_categories'] = $data['i_service_categories'] ?? [];
+        $sr['service_ids']        = $data['services_selected']    ?? [];
+        $this->intake->update([
+            'services_required' => $sr,
+            'priority_level'    => (int) ($data['priority_level'] ?? 3),
+        ]);
+    }
+
+    protected function saveSectionJ(array $data): void
+    {
+        $sr = $this->intake->services_required ?? [];
+        $sr['payment_method'] = $data['expected_payment_method']   ?? null;
+        $sr['sha_enrolled']   = (bool) ($data['sha_enrolled']      ?? false);
+        $sr['ncpwd_covered']  = (bool) ($data['ncpwd_covered']     ?? false);
+        $sr['has_insurance']  = (bool) ($data['has_private_insurance'] ?? false);
+        $sr['payment_notes']  = $data['payment_notes']             ?? null;
+        $this->intake->update(['services_required' => $sr]);
+    }
+
+    protected function saveSectionK(array $data): void
+    {
+        if (!empty($data['defer_client'])) {
+            $deferralReason = $data['deferral_reason'] ?? null;
+            if ($deferralReason === 'other' && !empty($data['deferral_reason_other'])) {
+                $deferralReason = 'other: ' . $data['deferral_reason_other'];
+            }
+            $updateData = array_filter([
+                'status'          => 'deferred',
+                'deferral_reason' => $deferralReason,
+                'deferral_notes'  => $data['deferral_notes']        ?? null,
+            ], fn($v) => $v !== null);
+            // next_appointment_date handled separately to avoid null-filtering a valid date
+            if (!empty($data['next_appointment_date'])) {
+                $updateData['next_appointment_date'] = $data['next_appointment_date'];
+            }
+            $this->intake->visit->update($updateData);
+        }
+        // Section K has no required fields — auto-completes on first save (handled by computeSectionStatus)
+    }
+
+    protected function saveSectionL(array $data): void
+    {
+        $this->intake->update([
+            'assessment_summary'  => $data['assessment_summary'] ?? null,
+            'recommendations'     => $data['recommendations']    ?? null,
+            'priority_level'      => (int) ($data['priority_level'] ?? 3),
+            'data_verified'       => (bool) ($data['data_verified'] ?? false),
+        ]);
+    }
 
     // ── Finalize (implemented in Task 9) ──────────────────────────────────────
     public function finalize(): void {}

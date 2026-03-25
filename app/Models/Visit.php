@@ -43,6 +43,10 @@ class Visit extends Model
         'queue_number',
         'payment_verified_at',
         'payment_status', // 'pending', 'partial', 'paid'
+        // Deferral
+        'deferral_reason',
+        'deferral_notes',
+        'next_appointment_date',
     ];
 
     protected $casts = [

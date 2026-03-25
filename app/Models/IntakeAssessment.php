@@ -38,6 +38,8 @@ class IntakeAssessment extends Model
         'is_finalized',
         'finalized_at',
         'functional_screening_scores',
+        'services_required',
+        'assessment_summary',
     ];
 
     protected $casts = [
@@ -49,6 +51,7 @@ class IntakeAssessment extends Model
         'is_finalized' => 'boolean',
         'finalized_at' => 'datetime',
         'functional_screening_scores' => 'array',
+        'services_required' => 'array',
     ];
 
     public function visit(): BelongsTo
