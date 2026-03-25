@@ -704,7 +704,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                     }
                     $createdSvcPoints[$spSlug] = true;
                     AssessmentAutoReferral::create([
-                        'form_response_id' => $intake->functionalScreening?->id ?? $intake->id,
+                        'form_response_id' => null,   // nullable — auto-referrals from functional screening have no form response
                         'client_id'        => $client->id,
                         'visit_id'         => $visit->id,
                         'service_point'    => $spSlug,
