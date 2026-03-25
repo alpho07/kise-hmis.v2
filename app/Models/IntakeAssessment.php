@@ -34,13 +34,23 @@ class IntakeAssessment extends Model
         'service_recommendations',
         'referral_categories',
         'priority_level',
+        'section_status',
+        'is_finalized',
+        'finalized_at',
+        'functional_screening_scores',
+        'services_required',
     ];
 
     protected $casts = [
         'data_verified' => 'boolean',
         'service_recommendations' => 'array',
-    'referral_categories' => 'array',
-    'priority_level' => 'integer',
+        'referral_categories' => 'array',
+        'priority_level' => 'integer',
+        'section_status' => 'array',
+        'is_finalized' => 'boolean',
+        'finalized_at' => 'datetime',
+        'functional_screening_scores' => 'array',
+        'services_required' => 'array',
     ];
 
     public function visit(): BelongsTo

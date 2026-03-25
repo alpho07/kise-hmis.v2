@@ -169,26 +169,13 @@ class IntakeQueueResource extends Resource
                     ->icon('heroicon-o-eye')
                     ->color('primary')
                     ->visible(function ($record) {
-                        return AssessmentFormResponse::where('visit_id', $record->id)
-                            ->whereHas('schema', function ($q) {
-                                $q->where('slug', 'intake-assessment');
-                            })
-                            ->exists();
+                        return \App\Models\IntakeAssessment::where('visit_id', $record->id)->exists();
                     })
                     ->url(function ($record) {
-                        $intake = AssessmentFormResponse::where('visit_id', $record->id)
-                            ->whereHas('schema', function ($q) {
-                                $q->where('slug', 'intake-assessment');
-                            })
-                            ->first();
-                        
-                        if (!$intake) return '#';
-                        
-                        if ($intake->status === 'completed') {
-                            return "/admin/dynamic-assessments/{$intake->id}";
-                        }
-                        
-                        return "/admin/dynamic-assessments/{$intake->id}/edit";
+                        $intake = \App\Models\IntakeAssessment::where('visit_id', $record->id)->first();
+                        return $intake
+                            ? route('filament.admin.pages.intake-assessment-editor', ['intakeId' => $intake->id])
+                            : '#';
                     })
                     ->openUrlInNewTab(),
             ])

@@ -1,0 +1,857 @@
+<?php
+
+namespace App\Filament\Pages;
+
+use App\Filament\Resources\IntakeAssessmentResource;
+use App\Models\Client;
+use App\Models\ClientDisability;
+use App\Models\ClientEducation;
+use App\Models\ClientMedicalHistory;
+use App\Models\ClientSocioDemographic;
+use App\Models\FunctionalScreening;
+use App\Models\IntakeAssessment;
+use App\Models\Visit;
+// Pre-imported for Task 5-9 save methods and finalize():
+use App\Models\AssessmentAutoReferral;
+use App\Models\Department;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\Service;
+use App\Models\ServiceBooking;
+use Carbon\Carbon;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
+
+class IntakeAssessmentEditor extends Page implements HasForms
+{
+    use InteractsWithForms;
+
+    protected static string $view = 'filament.pages.intake-assessment-editor';
+    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $title = 'Intake Assessment Editor';
+
+    #[Url]
+    public int $intakeId = 0;
+
+    public string $activeSection = 'A';
+    public array $sectionStatus  = [];
+    public bool  $isSaving       = false;
+
+    public ?IntakeAssessment $intake = null;
+    public ?Client $client = null;
+
+    /** One data bag per section — Filament forms bind to sectionData.X */
+    public array $sectionData = [];
+
+    protected array $sections = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasRole(['intake_officer', 'admin', 'super_admin']) ?? false;
+    }
+
+    public function mount(): void
+    {
+        abort_unless($this->intakeId > 0, 404);
+        abort_unless(static::canAccess(), 403);
+
+        $this->intake = IntakeAssessment::with([
+            'visit.branch', 'client.county', 'client.subCounty', 'functionalScreening',
+        ])->findOrFail($this->intakeId);
+
+        $this->client = $this->intake->client;
+
+        $this->sectionStatus = array_merge(
+            array_fill_keys($this->sections, 'incomplete'),
+            $this->intake->section_status ?? []
+        );
+
+        // Section A always auto-completes when client is linked
+        if ($this->intake->client_id) {
+            $this->sectionStatus['A'] = 'complete';
+        }
+
+        $this->fillSectionData();
+    }
+
+    protected function fillSectionData(): void
+    {
+        $intake = $this->intake;
+        $client = $this->client;
+        $visit  = $intake->visit;
+        $sr     = $intake->services_required ?? [];
+
+        if (!$client) {
+            // Client not linked yet — leave section data empty
+            return;
+        }
+
+        $this->sectionData['B'] = [
+            'verification_mode'         => $intake->verification_mode,
+            'verification_notes'        => $intake->verification_notes,
+            'b_national_id'             => $client->national_id,
+            'b_birth_certificate'       => $client->birth_certificate_number,
+            'b_phone_primary'           => $client->phone_primary,
+            'b_phone_secondary'         => $client->phone_secondary,
+            'b_preferred_communication' => $client->preferred_communication,
+            'b_consent_to_sms'          => $client->consent_to_sms,
+            'b_sha_number'              => $client->sha_number,
+            'b_ncpwd_number'            => $client->ncpwd_number,
+            'b_county_id'               => $client->county_id,
+            'b_sub_county_id'           => $client->sub_county_id,
+            'b_ward_id'                 => $client->ward_id,
+            'b_primary_address'         => $client->primary_address,
+            'b_landmark'                => $client->landmark,
+        ];
+
+        $disability = ClientDisability::where('client_id', $client->id)->first();
+        $this->sectionData['C'] = $disability ? [
+            'dis_is_disability_known'   => $disability->is_disability_known,
+            'dis_disability_categories' => $disability->disability_categories ?? [],
+            'dis_onset'                 => $disability->onset,
+            'dis_level_of_functioning'  => $disability->level_of_functioning,
+            'e2_current_devices'        => $disability->assistive_technology ?? [],
+            'dis_disability_notes'      => $disability->disability_notes,
+        ] : [];
+
+        $socio = ClientSocioDemographic::where('client_id', $client->id)->first();
+        $this->sectionData['D'] = $socio ? [
+            'socio_marital_status'        => $socio->marital_status,
+            'socio_living_arrangement'    => $socio->living_arrangement,
+            'socio_household_size'        => $socio->household_size,
+            'socio_primary_caregiver'     => $socio->primary_caregiver,
+            'socio_source_of_support'     => $socio->source_of_support ?? [],
+            'socio_primary_language'      => $socio->primary_language,
+            'socio_other_languages'       => $socio->other_languages[0] ?? null,
+            'socio_accessibility_at_home' => $socio->accessibility_at_home,
+            'socio_notes'                 => $socio->socio_notes,
+        ] : [];
+
+        $med = ClientMedicalHistory::where('client_id', $client->id)->first();
+        $this->sectionData['E'] = $med ? [
+            'med_medical_conditions'     => $med->medical_conditions ?? [],
+            'med_current_medications'    => $med->current_medications,
+            'med_surgical_history'       => $med->surgical_history,
+            'med_family_medical_history' => $med->family_medical_history,
+            'med_immunization_status'    => $med->immunization_status,
+            'med_previous_assessments'   => $med->previous_assessments ?? [],
+            'peri_developmental_concerns'=> $med->developmental_concerns ?? [],
+        ] : [];
+
+        $edu = ClientEducation::where('client_id', $client->id)->first();
+        $this->sectionData['F'] = $edu ? [
+            'edu_education_level'    => $edu->education_level,
+            'edu_school_type'        => $edu->school_type,
+            'edu_school_name'        => $edu->school_name,
+            'edu_grade_level'        => $edu->grade_level,
+            'edu_currently_enrolled' => $edu->currently_enrolled ? 'yes' : 'no',
+            'edu_employment_status'  => $edu->employment_status,
+            'edu_occupation_type'    => $edu->occupation_type,
+            'edu_education_notes'    => $edu->education_notes,
+        ] : [];
+
+        $scores = $intake->functional_screening_scores ?? [];
+        $this->sectionData['G'] = array_merge(
+            ['visit_id' => $intake->visit_id, 'func_overall_summary' => $intake->functionalScreening?->overall_summary],
+            $this->flattenScreeningAnswers($scores)
+        );
+
+        $this->sectionData['H'] = [
+            'referral_source'        => $sr['referral_source'] ?? [],
+            'referral_contact'       => $sr['referral_contact'] ?? null,
+            'reason_for_visit'       => $intake->reason_for_visit,
+            'current_concerns'       => $intake->current_concerns,
+            'previous_interventions' => $intake->previous_interventions,
+        ];
+
+        $this->sectionData['I'] = [
+            'visit_id'             => $intake->visit_id,
+            'i_primary_service_id' => $sr['primary_service_id'] ?? null,
+            'i_service_categories' => $sr['service_categories'] ?? [],
+            'services_selected'    => $sr['service_ids'] ?? [],
+            'priority_level'       => $intake->priority_level,
+        ];
+
+        $this->sectionData['J'] = [
+            'expected_payment_method' => $sr['payment_method'] ?? null,
+            'sha_enrolled'            => $sr['sha_enrolled'] ?? false,
+            'ncpwd_covered'           => $sr['ncpwd_covered'] ?? false,
+            'has_private_insurance'   => $sr['has_insurance'] ?? false,
+            'payment_notes'           => $sr['payment_notes'] ?? null,
+        ];
+
+        // TODO: deferral_reason, deferral_notes, next_appointment_date do not yet exist on
+        // the visits table or intake_assessments table — they return null on initial load
+        // until the deferral migration is added (Task 8).
+        $this->sectionData['K'] = [
+            'defer_client'          => $visit->status === 'deferred',
+            'deferral_reason'       => $visit->deferral_reason,
+            'deferral_notes'        => $visit->deferral_notes,
+            'next_appointment_date' => $visit->next_appointment_date,
+        ];
+
+        $this->sectionData['L'] = [
+            'assessment_summary' => $intake->assessment_summary,
+            'recommendations'    => $intake->recommendations,
+            'priority_level'     => $intake->priority_level,
+            'data_verified'      => $intake->data_verified,
+        ];
+    }
+
+    protected function flattenScreeningAnswers(array $scores): array
+    {
+        $flat = [];
+        $band = $scores['band'] ?? null;
+        if (!$band) return $flat;
+        foreach ($scores['answers'] ?? [] as $domain => $questions) {
+            foreach ($questions as $qKey => $answer) {
+                $flat[$qKey === '_notes' ? "g_{$band}_{$domain}_notes" : "g_{$band}_{$domain}_{$qKey}"] = $answer;
+            }
+        }
+        return $flat;
+    }
+
+    public function getForms(): array
+    {
+        return ['sectionBForm','sectionCForm','sectionDForm','sectionEForm','sectionFForm',
+                'sectionGForm','sectionHForm','sectionIForm','sectionJForm','sectionKForm','sectionLForm'];
+    }
+
+    public function sectionBForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.B')->schema(IntakeAssessmentResource::sectionBSchema($this->intake?->visit_id));
+    }
+    public function sectionCForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.C')->schema(IntakeAssessmentResource::sectionCSchema($this->intake?->visit_id));
+    }
+    public function sectionDForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.D')->schema(IntakeAssessmentResource::sectionDSchema($this->intake?->visit_id));
+    }
+    public function sectionEForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.E')->schema(IntakeAssessmentResource::sectionESchema($this->intake?->visit_id));
+    }
+    public function sectionFForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.F')->schema(IntakeAssessmentResource::sectionFSchema($this->intake?->visit_id));
+    }
+    public function sectionGForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.G')->schema(IntakeAssessmentResource::sectionGSchema($this->intake?->visit_id));
+    }
+    public function sectionHForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.H')->schema(IntakeAssessmentResource::sectionHSchema($this->intake?->visit_id));
+    }
+    public function sectionIForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.I')->schema(IntakeAssessmentResource::sectionISchema($this->intake?->visit_id));
+    }
+    public function sectionJForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.J')->schema(IntakeAssessmentResource::sectionJSchema($this->intake?->visit_id));
+    }
+    public function sectionKForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.K')->schema(IntakeAssessmentResource::sectionKSchema($this->intake?->visit_id));
+    }
+    public function sectionLForm(Form $form): Form
+    {
+        return $form->statePath('sectionData.L')->schema(IntakeAssessmentResource::sectionLSchema($this->intake?->visit_id));
+    }
+
+    public function switchSection(string $section): void
+    {
+        $this->activeSection = $section;
+    }
+
+    public function prevSection(): void
+    {
+        $idx = array_search($this->activeSection, $this->sections);
+        if ($idx > 0) $this->activeSection = $this->sections[$idx - 1];
+    }
+
+    public function nextSection(): void
+    {
+        $idx = array_search($this->activeSection, $this->sections);
+        if ($idx < count($this->sections) - 1) $this->activeSection = $this->sections[$idx + 1];
+    }
+
+    /**
+     * Called by Alpine.js capture div in the blade when any input blurs/changes.
+     * Alpine wraps each section form with a 1s debounced listener that calls this method.
+     */
+    public function saveSectionData(string $section): void
+    {
+        if (!in_array($section, $this->sections) || $section === 'A') return;
+        $this->isSaving = true;
+        try {
+            $method = 'saveSection' . $section;
+            if (method_exists($this, $method)) {
+                $this->$method($this->sectionData[$section] ?? []);
+            }
+            $this->updateSectionStatus($section);
+        } catch (\Throwable $e) {
+            Notification::make()->danger()
+                ->title('Autosave failed')
+                ->body("Section {$section} could not be saved. Please try again.")
+                ->send();
+        } finally {
+            $this->isSaving = false;
+        }
+    }
+
+    protected function updateSectionStatus(string $section): void
+    {
+        $status = $this->computeSectionStatus($section);
+        DB::transaction(function () use ($section, $status) {
+            $this->intake->refresh();
+            $updated = array_merge($this->intake->section_status ?? [], [$section => $status]);
+            $this->intake->update(['section_status' => $updated]);
+            $this->sectionStatus[$section] = $status;
+        });
+    }
+
+    protected function computeSectionStatus(string $section): string
+    {
+        $data     = $this->sectionData[$section] ?? [];
+        $required = $this->requiredFields()[$section] ?? [];
+        if (empty($required)) return 'complete';
+        foreach ($required as $field) {
+            $val = $data[$field] ?? null;
+            if ($val === null || $val === '' || $val === []) return 'in_progress';
+        }
+        return 'complete';
+    }
+
+    protected function requiredFields(): array
+    {
+        return [
+            'A' => [],
+            'B' => ['verification_mode'],
+            'C' => ['dis_is_disability_known'],
+            'D' => ['socio_marital_status', 'socio_primary_language'],
+            'E' => ['med_medical_conditions'],
+            'F' => ['edu_education_level'],
+            'G' => ['func_overall_summary'],
+            'H' => ['reason_for_visit'],
+            'I' => ['i_primary_service_id'],
+            'J' => ['expected_payment_method'],
+            'K' => [],  // deferral is optional; auto-completes on first save
+            'L' => ['assessment_summary'],
+        ];
+    }
+
+    public function getProgressProperty(): int
+    {
+        return count(array_filter($this->sectionStatus, fn($s) => $s === 'complete'));
+    }
+
+    public function getSectionLabelProperty(): array
+    {
+        return [
+            'A' => 'Client Overview',   'B' => 'ID & Contact',
+            'C' => 'Disability',        'D' => 'Socio-Demographics',
+            'E' => 'Medical History',   'F' => 'Education',
+            'G' => 'Funct. Screening',  'H' => 'Presenting Concern',
+            'I' => 'Service Plan',      'J' => 'Payment',
+            'K' => 'Deferral',          'L' => 'Summary',
+        ];
+    }
+
+    // ── Save methods (stubs — implemented in Tasks 5–8) ───────────────────────
+    protected function saveSectionB(array $data): void
+    {
+        $clientUpdates = array_filter([
+            'national_id'              => $data['b_national_id']              ?? null,
+            'birth_certificate_number' => $data['b_birth_certificate']        ?? null,
+            'phone_primary'            => $data['b_phone_primary']            ?? null,
+            'phone_secondary'          => $data['b_phone_secondary']          ?? null,
+            'preferred_communication'  => $data['b_preferred_communication']  ?? null,
+            'consent_to_sms'           => isset($data['b_consent_to_sms']) ? (bool) $data['b_consent_to_sms'] : null,
+            'sha_number'               => $data['b_sha_number']               ?? null,
+            'ncpwd_number'             => $data['b_ncpwd_number']             ?? null,
+            'county_id'                => $data['b_county_id']                ?? null,
+            'sub_county_id'            => $data['b_sub_county_id']            ?? null,
+            'ward_id'                  => $data['b_ward_id']                  ?? null,
+            'primary_address'          => $data['b_primary_address']          ?? null,
+            'landmark'                 => $data['b_landmark']                 ?? null,
+        ], fn($v) => $v !== null);
+
+        if ($clientUpdates) $this->client->update($clientUpdates);
+
+        $this->intake->update([
+            'verification_mode'  => $data['verification_mode']  ?? null,
+            'verification_notes' => $data['verification_notes'] ?? null,
+        ]);
+    }
+
+    protected function saveSectionC(array $data): void
+    {
+        if (empty($data['dis_is_disability_known'])) return;
+        $atDevices = array_map(function ($device) {
+            if (($device['device_type'] ?? null) === 'other' && !empty($device['device_type_other'])) {
+                $device['device_type'] = 'other: ' . $device['device_type_other'];
+            }
+            if (($device['source'] ?? null) === 'other' && !empty($device['source_other'])) {
+                $device['source'] = 'other: ' . $device['source_other'];
+            }
+            return $device;
+        }, $data['e2_current_devices'] ?? []);
+
+        ClientDisability::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'is_disability_known'   => true,
+                'disability_categories' => $data['dis_disability_categories'] ?? [],
+                'onset'                 => $data['dis_onset']                 ?? null,
+                'level_of_functioning'  => $data['dis_level_of_functioning']  ?? null,
+                'assistive_technology'  => $atDevices,
+                'disability_notes'      => $data['dis_disability_notes']      ?? null,
+            ]
+        );
+        if (($data['dis_ncpwd_registered'] ?? null) === 'yes' && !empty($data['dis_ncpwd_number'])) {
+            $this->client->update(['ncpwd_number' => $data['dis_ncpwd_number']]);
+        }
+    }
+
+    protected function saveSectionD(array $data): void
+    {
+        // marital_status is an ENUM — store only the enum value, not 'other: ...'
+        $maritalStatus = $data['socio_marital_status'] ?? null;
+
+        // primary_language is a VARCHAR — safe to store free-text detail
+        $primaryLanguage = ($data['socio_primary_language'] ?? null) === 'other'
+            ? 'other: ' . ($data['socio_language_other'] ?? 'unspecified')
+            : ($data['socio_primary_language'] ?? null);
+
+        ClientSocioDemographic::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'marital_status'     => $maritalStatus,
+                'living_arrangement' => $data['socio_living_arrangement'] ?? null,
+                'household_size'     => $data['socio_household_size']     ?? null,
+                'source_of_support'  => $data['socio_source_of_support']  ?? [],
+                'primary_language'   => $primaryLanguage,
+                'other_languages'    => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
+                'socio_notes'        => $data['socio_notes']               ?? null,
+            ]
+        );
+    }
+
+    protected function saveSectionE(array $data): void
+    {
+        $medConditions = $data['med_medical_conditions'] ?? [];
+        if (!empty($data['med_conditions_other'])) {
+            $medConditions[] = 'other: ' . $data['med_conditions_other'];
+        }
+
+        $prevAssessments = $data['med_previous_assessments'] ?? [];
+        if (!empty($data['med_previous_assessments_other'])) {
+            $prevAssessments[] = 'other: ' . $data['med_previous_assessments_other'];
+        }
+
+        $devConcerns = array_map(
+            fn($v) => $v === 'other' && !empty($data['peri_developmental_concerns_other'])
+                ? 'other: ' . $data['peri_developmental_concerns_other'] : $v,
+            $data['peri_developmental_concerns'] ?? []
+        );
+
+        $feedingConcernsRaw = $data['feeding_swallowing_concerns'] ?? [];
+        if (in_array('other', $feedingConcernsRaw, true) && !empty($data['feeding_swallowing_concerns_other'])) {
+            $feedingConcernsRaw = array_filter($feedingConcernsRaw, fn($v) => $v !== 'other');
+            $feedingConcernsRaw[] = 'other: ' . $data['feeding_swallowing_concerns_other'];
+        }
+        $feedingHistory = array_filter([
+            'feeding_method'      => $data['feeding_method']          ?? null,
+            'diet_appetite'       => $data['feeding_diet_appetite']   ?? null,
+            'swallowing_concerns' => $feedingConcernsRaw ?: null,
+            'growth_concern'      => $data['feeding_growth_concern']  ?? null,
+            'nutrition_notes'     => $data['feeding_nutrition_notes'] ?? null,
+        ], fn($v) => $v !== null && $v !== []);
+
+        ClientMedicalHistory::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'medical_conditions'           => $medConditions ?: null,
+                'current_medications'          => $data['med_current_medications']    ?? null,
+                'surgical_history'             => $data['med_surgical_history']       ?? null,
+                'family_medical_history'       => $data['med_family_medical_history'] ?? null,
+                'immunization_status'          => $data['med_immunization_status']    ?? null,
+                'feeding_history'              => $feedingHistory ?: null,
+                'previous_assessments'         => $prevAssessments,
+                'developmental_concerns'       => $devConcerns,
+                'developmental_concerns_notes' => $data['developmental_history']      ?? null,
+                'assistive_devices_history'    => $data['e2_previous_devices']        ?? [],
+            ]
+        );
+    }
+
+    protected function saveSectionF(array $data): void
+    {
+        // employment_status is an ENUM — store only the enum value, not 'other: ...'
+        $employmentStatus = $data['edu_employment_status'] ?? null;
+
+        ClientEducation::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'education_level'    => $data['edu_education_level'] ?? null,
+                'school_type'        => $data['edu_school_type']     ?? null,
+                'school_name'        => $data['edu_school_name']     ?? null,
+                'grade_level'        => $data['edu_grade_level']     ?? null,
+                'currently_enrolled' => ($data['edu_currently_enrolled'] ?? null) === 'yes',
+                'employment_status'  => $employmentStatus,
+                'occupation_type'    => $data['edu_occupation_type'] ?? null,
+                'education_notes'    => $data['edu_education_notes'] ?? null,
+            ]
+        );
+    }
+
+    protected function saveSectionG(array $data): void
+    {
+        // Resolve age directly from client DOB — avoids the Get $get dependency
+        $ageMonths = $this->client->date_of_birth
+            ? (int) Carbon::parse($this->client->date_of_birth)->diffInMonths(now())
+            : 9999;
+        $bandKey = IntakeAssessmentResource::detectBandKey($ageMonths);
+
+        // Rebuild screening answers from flat field names back into band→domain→question structure
+        $screeningAnswers = [];
+        $allQuestions = IntakeAssessmentResource::screeningQuestions();
+        if (isset($allQuestions[$bandKey])) {
+            foreach ($allQuestions[$bandKey]['domains'] as $domainKey => $domain) {
+                foreach ($domain['questions'] as $qKey => $q) {
+                    $fieldName = "g_{$bandKey}_{$domainKey}_{$qKey}";
+                    $screeningAnswers[$domainKey][$qKey] = $data[$fieldName] ?? null;
+                }
+                $notesField = "g_{$bandKey}_{$domainKey}_notes";
+                if (!empty($data[$notesField])) {
+                    $screeningAnswers[$domainKey]['_notes'] = $data[$notesField];
+                }
+            }
+        }
+
+        $scores = ['band' => $bandKey, 'age_months' => $ageMonths, 'answers' => $screeningAnswers];
+
+        $this->intake->update(['functional_screening_scores' => $scores]);
+
+        FunctionalScreening::updateOrCreate(
+            ['intake_assessment_id' => $this->intake->id],
+            [
+                'client_id'       => $this->client->id,
+                'overall_summary' => $data['func_overall_summary'] ?? null,
+            ]
+        );
+        // NOTE: Auto-referrals from functional screening are created only in finalize()
+    }
+    protected function saveSectionH(array $data): void
+    {
+        $sources = $data['referral_source'] ?? [];
+        if (in_array('other', $sources, true) && !empty($data['referral_source_other'])) {
+            $sources = array_filter($sources, fn($v) => $v !== 'other');
+            $sources[] = 'other: ' . $data['referral_source_other'];
+        }
+        $sr = $this->intake->services_required ?? [];
+        $sr['referral_source']  = array_values($sources);
+        $sr['referral_contact'] = $data['referral_contact'] ?? null;
+        $this->intake->update([
+            'reason_for_visit'       => $data['reason_for_visit']       ?? null,
+            'current_concerns'       => $data['current_concerns']       ?? null,
+            'previous_interventions' => $data['previous_interventions'] ?? null,
+            'services_required'      => $sr,
+        ]);
+    }
+
+    protected function saveSectionI(array $data): void
+    {
+        $sr = $this->intake->services_required ?? [];
+        $sr['primary_service_id'] = $data['i_primary_service_id'] ?? null;
+        $sr['service_categories'] = $data['i_service_categories'] ?? [];
+        $sr['service_ids']        = $data['services_selected']    ?? [];
+        $this->intake->update([
+            'services_required' => $sr,
+            'priority_level'    => (int) ($data['priority_level'] ?? 3),
+        ]);
+    }
+
+    protected function saveSectionJ(array $data): void
+    {
+        $sr = $this->intake->services_required ?? [];
+        $sr['payment_method'] = $data['expected_payment_method']   ?? null;
+        $sr['sha_enrolled']   = (bool) ($data['sha_enrolled']      ?? false);
+        $sr['ncpwd_covered']  = (bool) ($data['ncpwd_covered']     ?? false);
+        $sr['has_insurance']  = (bool) ($data['has_private_insurance'] ?? false);
+        $sr['payment_notes']  = $data['payment_notes']             ?? null;
+        $this->intake->update(['services_required' => $sr]);
+    }
+
+    protected function saveSectionK(array $data): void
+    {
+        if (!empty($data['defer_client'])) {
+            $deferralReason = $data['deferral_reason'] ?? null;
+            if ($deferralReason === 'other' && !empty($data['deferral_reason_other'])) {
+                $deferralReason = 'other: ' . $data['deferral_reason_other'];
+            }
+            $updateData = array_filter([
+                'status'          => 'deferred',
+                'deferral_reason' => $deferralReason,
+                'deferral_notes'  => $data['deferral_notes']        ?? null,
+                'deferred_at'     => now(),
+            ], fn($v) => $v !== null);
+            // next_appointment_date handled separately to avoid null-filtering a valid date
+            if (!empty($data['next_appointment_date'])) {
+                $updateData['next_appointment_date'] = $data['next_appointment_date'];
+            }
+            $this->intake->visit->update($updateData);
+        }
+        // Section K has no required fields — auto-completes on first save (handled by computeSectionStatus)
+    }
+
+    protected function saveSectionL(array $data): void
+    {
+        $this->intake->update([
+            'assessment_summary'  => $data['assessment_summary'] ?? null,
+            'recommendations'     => $data['recommendations']    ?? null,
+            'priority_level'      => (int) ($data['priority_level'] ?? 3),
+            'data_verified'       => (bool) ($data['data_verified'] ?? false),
+        ]);
+    }
+
+    // ── Finalize ───────────────────────────────────────────────────────────────
+    public function finalize(): void
+    {
+        // Guard: all sections complete
+        $incomplete = array_keys(array_filter($this->sectionStatus, fn ($s) => $s !== 'complete'));
+        if (! empty($incomplete)) {
+            Notification::make()->danger()
+                ->title('Cannot finalize')
+                ->body('Incomplete sections: ' . implode(', ', $incomplete))
+                ->send();
+            return;
+        }
+
+        // Guard: deferred visits cannot be finalized
+        if ($this->intake->visit->status === 'deferred') {
+            Notification::make()->warning()
+                ->title('Visit is deferred')
+                ->body('Resolve the deferral before finalizing.')
+                ->send();
+            return;
+        }
+
+        DB::transaction(function () {
+            $intake = $this->intake->refresh()->load(['visit.branch', 'functionalScreening']);
+            $visit  = $intake->visit;
+            $client = $this->client;
+            $sr     = $intake->services_required ?? [];
+            $scores = $intake->functional_screening_scores ?? [];
+
+            // ── Auto-referrals from functional screening ──────────────────
+            $bandKey          = $scores['band'] ?? null;
+            $screeningAnswers = $scores['answers'] ?? [];
+
+            if ($bandKey && isset(IntakeAssessmentResource::screeningQuestions()[$bandKey])) {
+                $allQuestions = IntakeAssessmentResource::screeningQuestions();
+                $bandDomains  = $allQuestions[$bandKey]['domains'];
+                $domainSvcMap = IntakeAssessmentResource::screeningDomainServiceMap();
+                $deptNames    = array_unique(array_column($domainSvcMap, 'department'));
+                $deptIds      = Department::whereIn('name', $deptNames)->pluck('id', 'name')->all();
+                $deptMinPrice = Service::where('is_active', true)
+                    ->whereIn('department_id', array_values($deptIds))
+                    ->selectRaw('department_id, MIN(base_price) as min_price')
+                    ->groupBy('department_id')
+                    ->pluck('min_price', 'department_id')
+                    ->all();
+                $servicePricesByDept = [];
+                foreach ($deptIds as $deptName => $deptId) {
+                    if (isset($deptMinPrice[$deptId])) {
+                        $servicePricesByDept[$deptName] = $deptMinPrice[$deptId];
+                    }
+                }
+
+                $createdSvcPoints = [];
+                foreach ($bandDomains as $domainKey => $domain) {
+                    $route = $domainSvcMap[$domainKey] ?? null;
+                    if (! $route) {
+                        continue;
+                    }
+                    $spSlug = $route['service_point'];
+                    if (isset($createdSvcPoints[$spSlug])) {
+                        continue;
+                    }
+                    $domainAnswers = $screeningAnswers[$domainKey] ?? [];
+                    $flagged       = [];
+                    $highPriority  = false;
+                    foreach ($domain['questions'] as $qKey => $q) {
+                        $answer = $domainAnswers[$qKey] ?? null;
+                        if ($answer === ($q['flag'] ?? null)) {
+                            $flagged[] = $q['text'];
+                            if (($q['priority'] ?? 'routine') === 'high') {
+                                $highPriority = true;
+                            }
+                        }
+                    }
+                    if (empty($flagged)) {
+                        continue;
+                    }
+                    $createdSvcPoints[$spSlug] = true;
+                    AssessmentAutoReferral::create([
+                        'form_response_id' => null,   // nullable — auto-referrals from functional screening have no form response
+                        'client_id'        => $client->id,
+                        'visit_id'         => $visit->id,
+                        'service_point'    => $spSlug,
+                        'department'       => $route['department'],
+                        'priority'         => $highPriority ? 'high' : 'routine',
+                        'reason'           => "Functional screening — {$domain['label']} (band: {$bandKey}): "
+                                              . implode('; ', $flagged),
+                        'trigger_data'     => [
+                            'domain'           => $domainKey,
+                            'band'             => $bandKey,
+                            'flagged_questions' => $flagged,
+                            'estimated_cost'   => $servicePricesByDept[$route['department']] ?? null,
+                            'source'           => 'intake_functional_screening',
+                        ],
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+
+            // ── Service Bookings ──────────────────────────────────────────
+            // Delete any from a prior failed finalize attempt, then recreate
+            ServiceBooking::where('visit_id', $visit->id)
+                ->where('notes', 'intake-editor')
+                ->forceDelete();
+
+            $primaryServiceId = $sr['primary_service_id'] ?? null;
+            $allServiceIds    = array_unique(array_filter(array_merge(
+                $primaryServiceId ? [$primaryServiceId] : [],
+                $sr['service_ids'] ?? []
+            )));
+
+            foreach (Service::whereIn('id', $allServiceIds)->get() as $service) {
+                ServiceBooking::create([
+                    'visit_id'       => $visit->id,
+                    'client_id'      => $client->id,
+                    'service_id'     => $service->id,
+                    'department_id'  => $service->department_id,
+                    'quantity'       => 1,
+                    'unit_price'     => $service->base_price ?? 0,
+                    'total_price'    => $service->base_price ?? 0,
+                    'status'         => 'pending',
+                    'booked_by'      => Auth::id(),
+                    'notes'          => 'intake-editor',
+                ]);
+            }
+
+            // ── Invoice ──────────────────────────────────────────────────
+            $paymentMethod = $sr['payment_method'] ?? 'cash';
+            $hasSponsor    = in_array($paymentMethod, ['sha', 'ncpwd', 'insurance_private', 'waiver', 'combination'], true);
+            $branchCode    = $visit->branch ? strtoupper(substr($visit->branch->name, 0, 3)) : 'HQ';
+            $invYear       = now()->format('Y');
+            $invMonth      = now()->format('m');
+            $invSeq        = Invoice::whereYear('created_at', $invYear)
+                ->whereMonth('created_at', $invMonth)
+                ->count() + 1;
+            $invoiceNumber = "{$branchCode}/INV/{$invYear}/{$invMonth}/"
+                             . str_pad($invSeq, 4, '0', STR_PAD_LEFT);
+
+            $invoice = Invoice::create([
+                'visit_id'        => $visit->id,
+                'client_id'       => $client->id,
+                'branch_id'       => $visit->branch_id,
+                'invoice_number'  => $invoiceNumber,
+                'payment_pathway' => $paymentMethod,
+                'status'          => 'pending',
+                'generated_by'    => Auth::id(),
+                'notes'           => $sr['payment_notes'] ?? null,
+                'total_amount'    => 0,
+                'subtotal'        => 0,
+                'covered_amount'  => 0,
+                'balance_due'     => 0,
+            ]);
+
+            $clientRatio = match ($paymentMethod) {
+                'sha'               => 0.20,
+                'ncpwd'             => 0.10,
+                'waiver'            => 0.00,
+                'insurance_private' => 0.30,
+                'combination'       => 0.50,
+                default             => 1.00,
+            };
+
+            $total = $totalCovered = $totalClient = 0.0;
+
+            $bookings = ServiceBooking::where('visit_id', $visit->id)
+                ->where('notes', 'intake-editor')
+                ->with('service')
+                ->get();
+
+            foreach ($bookings as $booking) {
+                $base       = (float) ($booking->service?->base_price ?? 0);
+                $clientPays = round($base * $clientRatio, 2);
+                $covered    = round($base - $clientPays, 2);
+
+                InvoiceItem::create([
+                    'invoice_id'              => $invoice->id,
+                    'service_booking_id'      => $booking->id,
+                    'service_id'              => $booking->service_id,
+                    'department_id'           => $booking->department_id,
+                    'item_description'        => $booking->service?->name ?? 'Service',
+                    'quantity'                => 1,
+                    'unit_price'              => $base,
+                    'subtotal'                => $base,
+                    'total'                   => $base,
+                    'covered_amount'          => $covered,
+                    'insurance_covered_amount' => $covered,
+                    'client_copay_amount'     => $clientPays,
+                ]);
+
+                $total        += $base;
+                $totalCovered += $covered;
+                $totalClient  += $clientPays;
+            }
+
+            $invoice->update([
+                'subtotal'            => $total,
+                'total_amount'        => $total,
+                'covered_amount'      => $totalCovered,
+                'total_sponsor_amount' => $totalCovered,
+                'total_client_amount'  => $totalClient,
+                'balance_due'         => $totalClient,
+                'has_sponsor'         => $hasSponsor,
+            ]);
+
+            // ── Mark finalized ────────────────────────────────────────────
+            $intake->update([
+                'assessed_by'  => Auth::id(),
+                'is_finalized' => true,
+                'finalized_at' => now(),
+            ]);
+
+            // ── Route visit ───────────────────────────────────────────────
+            $visit->completeStage();
+            if ($hasSponsor) {
+                $visit->moveToStage('billing');
+                $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
+            } else {
+                $visit->moveToStage('payment');
+                $routeLabel = 'Cashier — KES ' . number_format($totalClient, 2);
+            }
+
+            Notification::make()->success()
+                ->title('Intake Finalized')
+                ->body("{$client->full_name} → {$routeLabel}. Invoice #{$invoiceNumber} created.")
+                ->send();
+        });
+
+        $this->redirect(route('filament.admin.resources.intake-queues.index'));
+    }
+}

@@ -43,6 +43,11 @@ class Visit extends Model
         'queue_number',
         'payment_verified_at',
         'payment_status', // 'pending', 'partial', 'paid'
+        // Deferral
+        'deferral_reason',
+        'deferral_notes',
+        'deferred_at',
+        'next_appointment_date',
     ];
 
     protected $casts = [
@@ -53,6 +58,7 @@ class Visit extends Model
         'is_emergency' => 'boolean',
         'requires_followup' => 'boolean',
         'payment_verified_at' => 'datetime',
+        'next_appointment_date' => 'date',
     ];
 
     /**

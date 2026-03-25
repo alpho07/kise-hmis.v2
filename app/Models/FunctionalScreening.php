@@ -17,6 +17,7 @@ class FunctionalScreening extends Model
 
     protected $fillable = [
         'intake_assessment_id',
+        'client_id',
         'mobility_score',
         'self_care_score',
         'communication_score',
@@ -27,6 +28,7 @@ class FunctionalScreening extends Model
         'adaptive_skills_score',
         'total_score',
         'screening_notes',
+        'overall_summary',
     ];
 
     protected $casts = [

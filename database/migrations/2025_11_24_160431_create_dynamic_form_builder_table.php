@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Drop old schema tables if they exist from an earlier migration
+        Schema::dropIfExists('assessment_form_responses');
+        Schema::dropIfExists('assessment_form_schemas');
+
         // Form Schema Definitions
         Schema::create('assessment_form_schemas', function (Blueprint $table) {
             $table->id();
