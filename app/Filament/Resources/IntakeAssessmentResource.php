@@ -2460,7 +2460,17 @@ class IntakeAssessmentResource extends Resource
                 Tables\Columns\TextColumn::make('created_at')->label('Assessed')->dateTime('d M Y H:i')->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
-            ->actions([Tables\Actions\EditAction::make()]);
+            ->actions([
+                Tables\Actions\Action::make('open_editor')
+                    ->label('Open Editor')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('primary')
+                    ->url(fn(IntakeAssessment $record) => route(
+                        'filament.admin.pages.intake-assessment-editor',
+                        ['intakeId' => $record->id]
+                    )),
+                Tables\Actions\EditAction::make(),
+            ]);
     }
 
     public static function getPages(): array
