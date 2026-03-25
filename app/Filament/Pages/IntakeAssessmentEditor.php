@@ -153,6 +153,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'edu_currently_enrolled' => $edu->currently_enrolled ? 'yes' : 'no',
             'edu_employment_status'  => $edu->employment_status,
             'edu_occupation_type'    => $edu->occupation_type,
+            'edu_education_notes'    => $edu->education_notes,
         ] : [];
 
         $scores = $intake->functional_screening_scores ?? [];
