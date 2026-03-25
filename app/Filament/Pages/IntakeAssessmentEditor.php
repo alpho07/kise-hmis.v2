@@ -447,7 +447,53 @@ class IntakeAssessmentEditor extends Page implements HasForms
         );
     }
 
-    protected function saveSectionE(array $data): void {}
+    protected function saveSectionE(array $data): void
+    {
+        $medConditions = $data['med_medical_conditions'] ?? [];
+        if (!empty($data['med_conditions_other'])) {
+            $medConditions[] = 'other: ' . $data['med_conditions_other'];
+        }
+
+        $prevAssessments = $data['med_previous_assessments'] ?? [];
+        if (!empty($data['med_previous_assessments_other'])) {
+            $prevAssessments[] = 'other: ' . $data['med_previous_assessments_other'];
+        }
+
+        $devConcerns = array_map(
+            fn($v) => $v === 'other' && !empty($data['peri_developmental_concerns_other'])
+                ? 'other: ' . $data['peri_developmental_concerns_other'] : $v,
+            $data['peri_developmental_concerns'] ?? []
+        );
+
+        $feedingConcernsRaw = $data['feeding_swallowing_concerns'] ?? [];
+        if (in_array('other', $feedingConcernsRaw, true) && !empty($data['feeding_swallowing_concerns_other'])) {
+            $feedingConcernsRaw = array_filter($feedingConcernsRaw, fn($v) => $v !== 'other');
+            $feedingConcernsRaw[] = 'other: ' . $data['feeding_swallowing_concerns_other'];
+        }
+        $feedingHistory = array_filter([
+            'feeding_method'      => $data['feeding_method']          ?? null,
+            'diet_appetite'       => $data['feeding_diet_appetite']   ?? null,
+            'swallowing_concerns' => $feedingConcernsRaw ?: null,
+            'growth_concern'      => $data['feeding_growth_concern']  ?? null,
+            'nutrition_notes'     => $data['feeding_nutrition_notes'] ?? null,
+        ], fn($v) => $v !== null && $v !== []);
+
+        ClientMedicalHistory::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'medical_conditions'           => $medConditions ?: null,
+                'current_medications'          => $data['med_current_medications']    ?? null,
+                'surgical_history'             => $data['med_surgical_history']       ?? null,
+                'family_medical_history'       => $data['med_family_medical_history'] ?? null,
+                'immunization_status'          => $data['med_immunization_status']    ?? null,
+                'feeding_history'              => $feedingHistory ?: null,
+                'previous_assessments'         => $prevAssessments,
+                'developmental_concerns'       => $devConcerns,
+                'developmental_concerns_notes' => $data['developmental_history']      ?? null,
+                'assistive_devices_history'    => $data['e2_previous_devices']        ?? [],
+            ]
+        );
+    }
 
     protected function saveSectionF(array $data): void
     {

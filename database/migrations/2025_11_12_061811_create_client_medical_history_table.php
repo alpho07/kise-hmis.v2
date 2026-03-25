@@ -21,6 +21,7 @@ return new class extends Migration
             $table->text('surgical_history')->nullable();
             $table->text('immunization_status')->nullable();
             $table->text('family_medical_history')->nullable();
+            $table->json('feeding_history')->nullable();
             $table->timestamps();
             
             $table->index('client_id');
