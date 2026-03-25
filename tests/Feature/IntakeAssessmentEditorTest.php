@@ -139,7 +139,7 @@ class IntakeAssessmentEditorTest extends TestCase
 
         Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
             ->call('finalize')
-            ->assertNotified();
+            ->assertNotified("Cannot finalize");
     }
 
     /** finalize() sends a notification when visit is deferred */
@@ -163,6 +163,6 @@ class IntakeAssessmentEditorTest extends TestCase
 
         Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
             ->call('finalize')
-            ->assertNotified();
+            ->assertNotified("Visit is deferred");
     }
 }
