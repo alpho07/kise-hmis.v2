@@ -46,6 +46,7 @@ class Visit extends Model
         // Deferral
         'deferral_reason',
         'deferral_notes',
+        'deferred_at',
         'next_appointment_date',
     ];
 
@@ -57,6 +58,7 @@ class Visit extends Model
         'is_emergency' => 'boolean',
         'requires_followup' => 'boolean',
         'payment_verified_at' => 'datetime',
+        'next_appointment_date' => 'date',
     ];
 
     /**

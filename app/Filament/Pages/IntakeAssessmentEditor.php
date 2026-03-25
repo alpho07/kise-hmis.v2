@@ -604,6 +604,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'status'          => 'deferred',
                 'deferral_reason' => $deferralReason,
                 'deferral_notes'  => $data['deferral_notes']        ?? null,
+                'deferred_at'     => now(),
             ], fn($v) => $v !== null);
             // next_appointment_date handled separately to avoid null-filtering a valid date
             if (!empty($data['next_appointment_date'])) {

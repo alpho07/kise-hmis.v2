@@ -39,7 +39,6 @@ class IntakeAssessment extends Model
         'finalized_at',
         'functional_screening_scores',
         'services_required',
-        'assessment_summary',
     ];
 
     protected $casts = [
