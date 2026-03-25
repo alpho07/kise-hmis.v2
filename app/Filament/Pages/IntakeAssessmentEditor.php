@@ -820,10 +820,13 @@ class IntakeAssessmentEditor extends Page implements HasForms
             }
 
             $invoice->update([
-                'subtotal'       => $total,
-                'total_amount'   => $total,
-                'covered_amount' => $totalCovered,
-                'balance_due'    => $totalClient,
+                'subtotal'            => $total,
+                'total_amount'        => $total,
+                'covered_amount'      => $totalCovered,
+                'total_sponsor_amount' => $totalCovered,
+                'total_client_amount'  => $totalClient,
+                'balance_due'         => $totalClient,
+                'has_sponsor'         => $hasSponsor,
             ]);
 
             // ── Mark finalized ────────────────────────────────────────────
