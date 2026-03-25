@@ -47,9 +47,9 @@ class IntakeAssessmentResource extends Resource
         return self::$_ageCache[$visitId];
     }
 
-    public static function resolveClientAge(Get $get): int
+    public static function resolveClientAge(Get $get, ?int $explicitVisitId = null): int
     {
-        return (int) floor(self::resolveClientAgeMonths($get) / 12);
+        return (int) floor(self::resolveClientAgeMonths($get, $explicitVisitId) / 12);
     }
 
     public static function detectBandKey(int $ageMonths): string
@@ -940,12 +940,12 @@ class IntakeAssessmentResource extends Resource
                 ->options(['single' => 'Single', 'married' => 'Married', 'divorced' => 'Divorced', 'widowed' => 'Widowed', 'other' => 'Other (specify)'])
                 ->native(false)
                 ->live()
-                ->visible(fn(Get $get) => self::resolveClientAge($get) >= 18),
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) >= 18; }),
 
             Forms\Components\TextInput::make('socio_marital_other')
                 ->label('Marital Status — Specify')
                 ->placeholder('e.g. Cohabiting, Separated…')
-                ->visible(fn(Get $get) => self::resolveClientAge($get) >= 18 && $get('socio_marital_status') === 'other')
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) >= 18 && $get('socio_marital_status') === 'other'; })
                 ->required(fn(Get $get) => $get('socio_marital_status') === 'other'),
 
             Forms\Components\Select::make('socio_living_arrangement')
@@ -972,13 +972,13 @@ class IntakeAssessmentResource extends Resource
                 ->options(['mother' => 'Mother', 'father' => 'Father', 'guardian' => 'Guardian', 'relative' => 'Relative', 'sponsor' => 'Sponsor / Institution', 'other' => 'Other (specify)'])
                 ->native(false)
                 ->live()
-                ->visible(fn(Get $get) => self::resolveClientAge($get) < 18),
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 18; }),
 
             Forms\Components\TextInput::make('socio_caregiver_other')
                 ->label('Primary Caregiver — Specify')
                 ->placeholder('e.g. Step-parent, Social worker…')
-                ->visible(fn(Get $get) => self::resolveClientAge($get) < 18 && $get('socio_primary_caregiver') === 'other')
-                ->required(fn(Get $get) => self::resolveClientAge($get) < 18 && $get('socio_primary_caregiver') === 'other'),
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 18 && $get('socio_primary_caregiver') === 'other'; })
+                ->required(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 18 && $get('socio_primary_caregiver') === 'other'; }),
 
             Forms\Components\CheckboxList::make('socio_source_of_support')
                 ->label('Source of Support / Income')
@@ -1036,7 +1036,7 @@ class IntakeAssessmentResource extends Resource
                 ->inline()
                 ->inlineLabel(false)
                 ->helperText('If Yes, complete school details in Section F')
-                ->visible(fn(Get $get) => self::resolveClientAge($get) < 18)
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 18; })
                 ->columnSpanFull(),
 
             Forms\Components\Select::make('socio_accessibility_at_home')
@@ -1499,7 +1499,7 @@ class IntakeAssessmentResource extends Resource
                 ->icon('heroicon-o-sparkles')
                 ->collapsible()
                 ->collapsed(true)
-                ->visible(fn(Get $get) => self::resolveClientAge($get) < 19)
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 19; })
                 ->columns(2)
                 ->schema([
                     Forms\Components\CheckboxList::make('peri_pregnancy_complications')
@@ -1641,7 +1641,7 @@ class IntakeAssessmentResource extends Resource
                 ->icon('heroicon-o-shield-check')
                 ->collapsible()
                 ->collapsed(true)
-                ->visible(fn(Get $get) => self::resolveClientAge($get) < 19)
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 19; })
                 ->columns(2)
                 ->schema([
                     Forms\Components\Radio::make('imm_epi_card_seen')
@@ -1719,7 +1719,7 @@ class IntakeAssessmentResource extends Resource
                 ->icon('heroicon-o-cake')
                 ->collapsible()
                 ->collapsed(true)
-                ->visible(fn(Get $get) => self::resolveClientAge($get) < 19)
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 19; })
                 ->description('Auto-shown for age < 5. Also complete if Nutrition service is selected in Section I.')
                 ->columns(2)
                 ->schema([
@@ -1893,27 +1893,24 @@ class IntakeAssessmentResource extends Resource
                 ])
                 ->native(false)
                 ->live()
-                ->visible(fn(Get $get) => self::resolveClientAge($get) >= 18),
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) >= 18; }),
 
             Forms\Components\TextInput::make('edu_employment_status_other')
                 ->label('Employment Status — Specify')
                 ->placeholder('Describe employment situation…')
                 ->required(fn(Get $get) => $get('edu_employment_status') === 'other')
-                ->visible(fn(Get $get) => $get('edu_employment_status') === 'other' && self::resolveClientAge($get) >= 18),
+                ->visible(function (Get $get) use ($visitId) { return $get('edu_employment_status') === 'other' && self::resolveClientAge($get, $visitId) >= 18; }),
 
             Forms\Components\TextInput::make('edu_occupation_type')
                 ->label('Occupation / Role')
                 ->placeholder('e.g. Teacher, Farmer, Hawker')
-                ->visible(fn(Get $get) => self::resolveClientAge($get) >= 18),
+                ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) >= 18; }),
         ];
     }
 
     public static function sectionGSchema(?int $visitId = null): array
     {
         return [
-            Forms\Components\Hidden::make('visit_id')
-                ->default($visitId),
-
             Forms\Components\Placeholder::make('age_band_banner')
                 ->hiddenLabel()
                 ->content(function (Get $get) use ($visitId): HtmlString {
@@ -1929,6 +1926,12 @@ class IntakeAssessmentResource extends Resource
                     return new HtmlString('<div style="padding:10px 14px;background:#dbeafe;border-radius:8px;border-left:4px solid #3b82f6;color:#1e40af;font-size:13px;font-weight:600;">📊 Age Band: '.$label.' ('.$years.' yrs '.$rem.' mo) — questions below are age-appropriate.</div>');
                 })
                 ->columnSpanFull(),
+
+            ...array_map(
+                fn($bk, $band) => self::buildBandSection($bk, $band),
+                array_keys(self::screeningQuestions()),
+                array_values(self::screeningQuestions())
+            ),
         ];
     }
 
@@ -2398,13 +2401,6 @@ class IntakeAssessmentResource extends Resource
                 ->icon('heroicon-o-chart-bar')
                 ->collapsible()
                 ->schema(self::sectionGSchema((int) request()->query('visit'))),
-
-            // One section per band — only the matching band renders
-            ...array_map(
-                fn($bk, $band) => self::buildBandSection($bk, $band),
-                array_keys(self::screeningQuestions()),
-                array_values(self::screeningQuestions())
-            ),
 
             // ══ H — REFERRAL & PRESENTING CONCERN ═══════════════════════════════════
             Forms\Components\Section::make('H — Referral Source & Presenting Concern')
