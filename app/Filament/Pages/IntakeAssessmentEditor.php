@@ -367,11 +367,113 @@ class IntakeAssessmentEditor extends Page implements HasForms
     }
 
     // ── Save methods (stubs — implemented in Tasks 5–8) ───────────────────────
-    protected function saveSectionB(array $data): void {}
-    protected function saveSectionC(array $data): void {}
-    protected function saveSectionD(array $data): void {}
+    protected function saveSectionB(array $data): void
+    {
+        $clientUpdates = array_filter([
+            'national_id'              => $data['b_national_id']              ?? null,
+            'birth_certificate_number' => $data['b_birth_certificate']        ?? null,
+            'phone_primary'            => $data['b_phone_primary']            ?? null,
+            'phone_secondary'          => $data['b_phone_secondary']          ?? null,
+            'preferred_communication'  => $data['b_preferred_communication']  ?? null,
+            'consent_to_sms'           => isset($data['b_consent_to_sms']) ? (bool) $data['b_consent_to_sms'] : null,
+            'sha_number'               => $data['b_sha_number']               ?? null,
+            'ncpwd_number'             => $data['b_ncpwd_number']             ?? null,
+            'county_id'                => $data['b_county_id']                ?? null,
+            'sub_county_id'            => $data['b_sub_county_id']            ?? null,
+            'ward_id'                  => $data['b_ward_id']                  ?? null,
+            'primary_address'          => $data['b_primary_address']          ?? null,
+            'landmark'                 => $data['b_landmark']                 ?? null,
+        ], fn($v) => $v !== null);
+
+        if ($clientUpdates) $this->client->update($clientUpdates);
+
+        $this->intake->update([
+            'verification_mode'  => $data['verification_mode']  ?? null,
+            'verification_notes' => $data['verification_notes'] ?? null,
+        ]);
+    }
+
+    protected function saveSectionC(array $data): void
+    {
+        if (empty($data['dis_is_disability_known'])) return;
+        $atDevices = array_map(function ($device) {
+            if (($device['device_type'] ?? null) === 'other' && !empty($device['device_type_other'])) {
+                $device['device_type'] = 'other: ' . $device['device_type_other'];
+            }
+            if (($device['source'] ?? null) === 'other' && !empty($device['source_other'])) {
+                $device['source'] = 'other: ' . $device['source_other'];
+            }
+            return $device;
+        }, $data['e2_current_devices'] ?? []);
+
+        ClientDisability::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'is_disability_known'        => true,
+                'disability_categories'      => $data['dis_disability_categories'] ?? [],
+                'onset'                      => $data['dis_onset']                 ?? null,
+                'level_of_functioning'       => $data['dis_level_of_functioning']  ?? null,
+                'assistive_technology'       => $atDevices,
+                'assistive_technology_notes' => $data['dis_disability_notes']      ?? null,
+                'disability_notes'           => $data['dis_disability_notes']      ?? null,
+            ]
+        );
+        if (($data['dis_ncpwd_registered'] ?? null) === 'yes' && !empty($data['dis_ncpwd_number'])) {
+            $this->client->update(['ncpwd_number' => $data['dis_ncpwd_number']]);
+        }
+    }
+
+    protected function saveSectionD(array $data): void
+    {
+        $maritalStatus = ($data['socio_marital_status'] ?? null) === 'other'
+            ? 'other: ' . ($data['socio_marital_other'] ?? 'unspecified')
+            : ($data['socio_marital_status'] ?? null);
+        $primaryLanguage = ($data['socio_primary_language'] ?? null) === 'other'
+            ? 'other: ' . ($data['socio_language_other'] ?? 'unspecified')
+            : ($data['socio_primary_language'] ?? null);
+
+        ClientSocioDemographic::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'marital_status'        => $maritalStatus,
+                'living_arrangement'    => $data['socio_living_arrangement']    ?? null,
+                'household_size'        => $data['socio_household_size']        ?? null,
+                'primary_caregiver'     => $data['socio_primary_caregiver']     ?? null,
+                'source_of_support'     => $data['socio_source_of_support']     ?? [],
+                'primary_language'      => $primaryLanguage,
+                'other_languages'       => $data['socio_other_languages'] ? [$data['socio_other_languages']] : [],
+                'accessibility_at_home' => $data['socio_accessibility_at_home'] ?? null,
+                'socio_notes'           => $data['socio_notes']                 ?? null,
+            ]
+        );
+    }
+
     protected function saveSectionE(array $data): void {}
-    protected function saveSectionF(array $data): void {}
+
+    protected function saveSectionF(array $data): void
+    {
+        $employmentStatus = $data['edu_employment_status'] ?? null;
+        if ($employmentStatus === 'other' && !empty($data['edu_employment_status_other'])) {
+            $employmentStatus = 'other: ' . $data['edu_employment_status_other'];
+        }
+        ClientEducation::updateOrCreate(
+            ['client_id' => $this->client->id],
+            [
+                'education_level'       => $data['edu_education_level']        ?? null,
+                'school_type'           => $data['edu_school_type']            ?? null,
+                'school_name'           => $data['edu_school_name']            ?? null,
+                'grade_level'           => $data['edu_grade_level']            ?? null,
+                'currently_enrolled'    => ($data['edu_currently_enrolled']    ?? null) === 'yes',
+                'attendance_challenges' => ($data['edu_attendance_challenges'] ?? null) === 'yes',
+                'attendance_notes'      => $data['edu_attendance_notes']       ?? null,
+                'performance_concern'   => ($data['edu_performance_concern']   ?? null) === 'yes',
+                'performance_notes'     => $data['edu_performance_notes']      ?? null,
+                'employment_status'     => $employmentStatus,
+                'occupation_type'       => $data['edu_occupation_type']        ?? null,
+            ]
+        );
+    }
+
     protected function saveSectionG(array $data): void {}
     protected function saveSectionH(array $data): void {}
     protected function saveSectionI(array $data): void {}
