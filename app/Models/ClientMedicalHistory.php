@@ -31,6 +31,7 @@ class ClientMedicalHistory extends Model
     ];
 
     protected $casts = [
+        'medical_conditions' => 'array',
         'previous_assessments' => 'array',
         'developmental_concerns' => 'array',
         'assistive_devices_history' => 'array',

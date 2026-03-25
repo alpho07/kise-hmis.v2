@@ -16,7 +16,7 @@ return new class extends Migration
             $table->text('developmental_concerns_notes')->nullable();
             $table->json('assistive_devices_history')->nullable();
             $table->text('assistive_devices_notes')->nullable();
-            $table->text('medical_conditions')->nullable();
+            $table->json('medical_conditions')->nullable();
             $table->text('current_medications')->nullable();
             $table->text('surgical_history')->nullable();
             $table->text('immunization_status')->nullable();
