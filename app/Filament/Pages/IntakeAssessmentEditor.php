@@ -409,13 +409,12 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ClientDisability::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'is_disability_known'        => true,
-                'disability_categories'      => $data['dis_disability_categories'] ?? [],
-                'onset'                      => $data['dis_onset']                 ?? null,
-                'level_of_functioning'       => $data['dis_level_of_functioning']  ?? null,
-                'assistive_technology'       => $atDevices,
-                'assistive_technology_notes' => $data['dis_disability_notes']      ?? null,
-                'disability_notes'           => $data['dis_disability_notes']      ?? null,
+                'is_disability_known'   => true,
+                'disability_categories' => $data['dis_disability_categories'] ?? [],
+                'onset'                 => $data['dis_onset']                 ?? null,
+                'level_of_functioning'  => $data['dis_level_of_functioning']  ?? null,
+                'assistive_technology'  => $atDevices,
+                'disability_notes'      => $data['dis_disability_notes']      ?? null,
             ]
         );
         if (($data['dis_ncpwd_registered'] ?? null) === 'yes' && !empty($data['dis_ncpwd_number'])) {
@@ -425,9 +424,10 @@ class IntakeAssessmentEditor extends Page implements HasForms
 
     protected function saveSectionD(array $data): void
     {
-        $maritalStatus = ($data['socio_marital_status'] ?? null) === 'other'
-            ? 'other: ' . ($data['socio_marital_other'] ?? 'unspecified')
-            : ($data['socio_marital_status'] ?? null);
+        // marital_status is an ENUM — store only the enum value, not 'other: ...'
+        $maritalStatus = $data['socio_marital_status'] ?? null;
+
+        // primary_language is a VARCHAR — safe to store free-text detail
         $primaryLanguage = ($data['socio_primary_language'] ?? null) === 'other'
             ? 'other: ' . ($data['socio_language_other'] ?? 'unspecified')
             : ($data['socio_primary_language'] ?? null);
@@ -435,15 +435,13 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ClientSocioDemographic::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'marital_status'        => $maritalStatus,
-                'living_arrangement'    => $data['socio_living_arrangement']    ?? null,
-                'household_size'        => $data['socio_household_size']        ?? null,
-                'primary_caregiver'     => $data['socio_primary_caregiver']     ?? null,
-                'source_of_support'     => $data['socio_source_of_support']     ?? [],
-                'primary_language'      => $primaryLanguage,
-                'other_languages'       => $data['socio_other_languages'] ? [$data['socio_other_languages']] : [],
-                'accessibility_at_home' => $data['socio_accessibility_at_home'] ?? null,
-                'socio_notes'           => $data['socio_notes']                 ?? null,
+                'marital_status'     => $maritalStatus,
+                'living_arrangement' => $data['socio_living_arrangement'] ?? null,
+                'household_size'     => $data['socio_household_size']     ?? null,
+                'source_of_support'  => $data['socio_source_of_support']  ?? [],
+                'primary_language'   => $primaryLanguage,
+                'other_languages'    => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
+                'socio_notes'        => $data['socio_notes']               ?? null,
             ]
         );
     }
@@ -452,24 +450,20 @@ class IntakeAssessmentEditor extends Page implements HasForms
 
     protected function saveSectionF(array $data): void
     {
+        // employment_status is an ENUM — store only the enum value, not 'other: ...'
         $employmentStatus = $data['edu_employment_status'] ?? null;
-        if ($employmentStatus === 'other' && !empty($data['edu_employment_status_other'])) {
-            $employmentStatus = 'other: ' . $data['edu_employment_status_other'];
-        }
+
         ClientEducation::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'education_level'       => $data['edu_education_level']        ?? null,
-                'school_type'           => $data['edu_school_type']            ?? null,
-                'school_name'           => $data['edu_school_name']            ?? null,
-                'grade_level'           => $data['edu_grade_level']            ?? null,
-                'currently_enrolled'    => ($data['edu_currently_enrolled']    ?? null) === 'yes',
-                'attendance_challenges' => ($data['edu_attendance_challenges'] ?? null) === 'yes',
-                'attendance_notes'      => $data['edu_attendance_notes']       ?? null,
-                'performance_concern'   => ($data['edu_performance_concern']   ?? null) === 'yes',
-                'performance_notes'     => $data['edu_performance_notes']      ?? null,
-                'employment_status'     => $employmentStatus,
-                'occupation_type'       => $data['edu_occupation_type']        ?? null,
+                'education_level'    => $data['edu_education_level'] ?? null,
+                'school_type'        => $data['edu_school_type']     ?? null,
+                'school_name'        => $data['edu_school_name']     ?? null,
+                'grade_level'        => $data['edu_grade_level']     ?? null,
+                'currently_enrolled' => ($data['edu_currently_enrolled'] ?? null) === 'yes',
+                'employment_status'  => $employmentStatus,
+                'occupation_type'    => $data['edu_occupation_type'] ?? null,
+                'education_notes'    => $data['edu_education_notes'] ?? null,
             ]
         );
     }
