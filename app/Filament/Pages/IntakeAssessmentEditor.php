@@ -515,7 +515,43 @@ class IntakeAssessmentEditor extends Page implements HasForms
         );
     }
 
-    protected function saveSectionG(array $data): void {}
+    protected function saveSectionG(array $data): void
+    {
+        // Resolve age directly from client DOB — avoids the Get $get dependency
+        $ageMonths = $this->client->date_of_birth
+            ? (int) Carbon::parse($this->client->date_of_birth)->diffInMonths(now())
+            : 9999;
+        $bandKey = IntakeAssessmentResource::detectBandKey($ageMonths);
+
+        // Rebuild screening answers from flat field names back into band→domain→question structure
+        $screeningAnswers = [];
+        $allQuestions = IntakeAssessmentResource::screeningQuestions();
+        if (isset($allQuestions[$bandKey])) {
+            foreach ($allQuestions[$bandKey]['domains'] as $domainKey => $domain) {
+                foreach ($domain['questions'] as $qKey => $q) {
+                    $fieldName = "g_{$bandKey}_{$domainKey}_{$qKey}";
+                    $screeningAnswers[$domainKey][$qKey] = $data[$fieldName] ?? null;
+                }
+                $notesField = "g_{$bandKey}_{$domainKey}_notes";
+                if (!empty($data[$notesField])) {
+                    $screeningAnswers[$domainKey]['_notes'] = $data[$notesField];
+                }
+            }
+        }
+
+        $scores = ['band' => $bandKey, 'age_months' => $ageMonths, 'answers' => $screeningAnswers];
+
+        $this->intake->update(['functional_screening_scores' => $scores]);
+
+        FunctionalScreening::updateOrCreate(
+            ['intake_assessment_id' => $this->intake->id],
+            [
+                'client_id'       => $this->client->id,
+                'overall_summary' => $data['func_overall_summary'] ?? null,
+            ]
+        );
+        // NOTE: Auto-referrals from functional screening are created only in finalize()
+    }
     protected function saveSectionH(array $data): void {}
     protected function saveSectionI(array $data): void {}
     protected function saveSectionJ(array $data): void {}
