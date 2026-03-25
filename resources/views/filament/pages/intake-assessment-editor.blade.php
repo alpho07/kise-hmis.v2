@@ -95,40 +95,44 @@
                             This works regardless of Filament's internal form wiring.
                         --}}
                         <div
-                            x-data="{ saveTimer: null }"
-                            @blur.capture="clearTimeout(saveTimer); saveTimer = setTimeout(() => $wire.saveSectionData('{{ $activeSection }}'), 1000)"
-                            @change.capture="clearTimeout(saveTimer); saveTimer = setTimeout(() => $wire.saveSectionData('{{ $activeSection }}'), 1000)"
+                            x-data="{ saveTimer: null, section: $wire.entangle('activeSection') }"
+                            @blur.capture="clearTimeout(saveTimer); saveTimer = setTimeout(() => $wire.saveSectionData(section), 1000)"
+                            @change.capture="clearTimeout(saveTimer); saveTimer = setTimeout(() => $wire.saveSectionData(section), 1000)"
                         >
-                            @if($activeSection === 'B') {{ $this->sectionBForm }}
-                            @elseif($activeSection === 'C') {{ $this->sectionCForm }}
-                            @elseif($activeSection === 'D') {{ $this->sectionDForm }}
-                            @elseif($activeSection === 'E') {{ $this->sectionEForm }}
-                            @elseif($activeSection === 'F') {{ $this->sectionFForm }}
-                            @elseif($activeSection === 'G') {{ $this->sectionGForm }}
-                            @elseif($activeSection === 'H') {{ $this->sectionHForm }}
-                            @elseif($activeSection === 'I') {{ $this->sectionIForm }}
-                            @elseif($activeSection === 'J') {{ $this->sectionJForm }}
-                            @elseif($activeSection === 'K') {{ $this->sectionKForm }}
+                            @if($activeSection === 'B') {!! $this->sectionBForm !!}
+                            @elseif($activeSection === 'C') {!! $this->sectionCForm !!}
+                            @elseif($activeSection === 'D') {!! $this->sectionDForm !!}
+                            @elseif($activeSection === 'E') {!! $this->sectionEForm !!}
+                            @elseif($activeSection === 'F') {!! $this->sectionFForm !!}
+                            @elseif($activeSection === 'G') {!! $this->sectionGForm !!}
+                            @elseif($activeSection === 'H') {!! $this->sectionHForm !!}
+                            @elseif($activeSection === 'I') {!! $this->sectionIForm !!}
+                            @elseif($activeSection === 'J') {!! $this->sectionJForm !!}
+                            @elseif($activeSection === 'K') {!! $this->sectionKForm !!}
                             @elseif($activeSection === 'L')
-                                {{ $this->sectionLForm }}
+                                {!! $this->sectionLForm !!}
                                 @php
                                     $allComplete = !in_array('incomplete', $sectionStatus)
                                                && !in_array('in_progress', $sectionStatus);
                                 @endphp
                                 <div class="mt-6 flex justify-end">
-                                    <x-filament::button
+                                    <button
+                                        type="button"
                                         wire:click="finalize"
-                                        color="{{ $allComplete ? 'success' : 'gray' }}"
-                                        :disabled="! $allComplete"
-                                        size="xl"
                                         wire:loading.attr="disabled"
                                         wire:target="finalize"
+                                        @class([
+                                            'inline-flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-semibold transition-all',
+                                            'bg-green-600 hover:bg-green-700 text-white cursor-pointer' => $allComplete,
+                                            'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' => !$allComplete,
+                                        ])
+                                        @disabled(! $allComplete)
                                     >
-                                        <wire:loading wire:target="finalize">
-                                            <x-filament::loading-indicator class="h-4 w-4 mr-2"/>
-                                        </wire:loading>
+                                        <span wire:loading wire:target="finalize">
+                                            <x-filament::loading-indicator class="h-4 w-4"/>
+                                        </span>
                                         Finalize Assessment →
-                                    </x-filament::button>
+                                    </button>
                                 </div>
                             @endif
                         </div>
