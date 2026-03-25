@@ -625,6 +625,230 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ]);
     }
 
-    // ── Finalize (implemented in Task 9) ──────────────────────────────────────
-    public function finalize(): void {}
+    // ── Finalize ───────────────────────────────────────────────────────────────
+    public function finalize(): void
+    {
+        // Guard: all sections complete
+        $incomplete = array_keys(array_filter($this->sectionStatus, fn ($s) => $s !== 'complete'));
+        if (! empty($incomplete)) {
+            Notification::make()->danger()
+                ->title('Cannot finalize')
+                ->body('Incomplete sections: ' . implode(', ', $incomplete))
+                ->send();
+            return;
+        }
+
+        // Guard: deferred visits cannot be finalized
+        if ($this->intake->visit->status === 'deferred') {
+            Notification::make()->warning()
+                ->title('Visit is deferred')
+                ->body('Resolve the deferral before finalizing.')
+                ->send();
+            return;
+        }
+
+        DB::transaction(function () {
+            $intake = $this->intake->refresh()->load(['visit.branch', 'functionalScreening']);
+            $visit  = $intake->visit;
+            $client = $this->client;
+            $sr     = $intake->services_required ?? [];
+            $scores = $intake->functional_screening_scores ?? [];
+
+            // ── Auto-referrals from functional screening ──────────────────
+            $bandKey          = $scores['band'] ?? null;
+            $screeningAnswers = $scores['answers'] ?? [];
+
+            if ($bandKey && isset(IntakeAssessmentResource::screeningQuestions()[$bandKey])) {
+                $allQuestions = IntakeAssessmentResource::screeningQuestions();
+                $bandDomains  = $allQuestions[$bandKey]['domains'];
+                $domainSvcMap = IntakeAssessmentResource::screeningDomainServiceMap();
+                $deptNames    = array_unique(array_column($domainSvcMap, 'department'));
+                $deptIds      = Department::whereIn('name', $deptNames)->pluck('id', 'name')->all();
+                $deptMinPrice = Service::where('is_active', true)
+                    ->whereIn('department_id', array_values($deptIds))
+                    ->selectRaw('department_id, MIN(base_price) as min_price')
+                    ->groupBy('department_id')
+                    ->pluck('min_price', 'department_id')
+                    ->all();
+                $servicePricesByDept = [];
+                foreach ($deptIds as $deptName => $deptId) {
+                    if (isset($deptMinPrice[$deptId])) {
+                        $servicePricesByDept[$deptName] = $deptMinPrice[$deptId];
+                    }
+                }
+
+                $createdSvcPoints = [];
+                foreach ($bandDomains as $domainKey => $domain) {
+                    $route = $domainSvcMap[$domainKey] ?? null;
+                    if (! $route) {
+                        continue;
+                    }
+                    $spSlug = $route['service_point'];
+                    if (isset($createdSvcPoints[$spSlug])) {
+                        continue;
+                    }
+                    $domainAnswers = $screeningAnswers[$domainKey] ?? [];
+                    $flagged       = [];
+                    $highPriority  = false;
+                    foreach ($domain['questions'] as $qKey => $q) {
+                        $answer = $domainAnswers[$qKey] ?? null;
+                        if ($answer === ($q['flag'] ?? null)) {
+                            $flagged[] = $q['text'];
+                            if (($q['priority'] ?? 'routine') === 'high') {
+                                $highPriority = true;
+                            }
+                        }
+                    }
+                    if (empty($flagged)) {
+                        continue;
+                    }
+                    $createdSvcPoints[$spSlug] = true;
+                    AssessmentAutoReferral::create([
+                        'form_response_id' => $intake->functionalScreening?->id ?? $intake->id,
+                        'client_id'        => $client->id,
+                        'visit_id'         => $visit->id,
+                        'service_point'    => $spSlug,
+                        'department'       => $route['department'],
+                        'priority'         => $highPriority ? 'high' : 'routine',
+                        'reason'           => "Functional screening — {$domain['label']} (band: {$bandKey}): "
+                                              . implode('; ', $flagged),
+                        'trigger_data'     => [
+                            'domain'           => $domainKey,
+                            'band'             => $bandKey,
+                            'flagged_questions' => $flagged,
+                            'estimated_cost'   => $servicePricesByDept[$route['department']] ?? null,
+                            'source'           => 'intake_functional_screening',
+                        ],
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+
+            // ── Service Bookings ──────────────────────────────────────────
+            // Delete any from a prior failed finalize attempt, then recreate
+            ServiceBooking::where('visit_id', $visit->id)
+                ->where('notes', 'intake-editor')
+                ->forceDelete();
+
+            $primaryServiceId = $sr['primary_service_id'] ?? null;
+            $allServiceIds    = array_unique(array_filter(array_merge(
+                $primaryServiceId ? [$primaryServiceId] : [],
+                $sr['service_ids'] ?? []
+            )));
+
+            foreach (Service::whereIn('id', $allServiceIds)->get() as $service) {
+                ServiceBooking::create([
+                    'visit_id'       => $visit->id,
+                    'client_id'      => $client->id,
+                    'service_id'     => $service->id,
+                    'department_id'  => $service->department_id,
+                    'quantity'       => 1,
+                    'unit_price'     => $service->base_price ?? 0,
+                    'total_price'    => $service->base_price ?? 0,
+                    'status'         => 'pending',
+                    'booked_by'      => Auth::id(),
+                    'notes'          => 'intake-editor',
+                ]);
+            }
+
+            // ── Invoice ──────────────────────────────────────────────────
+            $paymentMethod = $sr['payment_method'] ?? 'cash';
+            $hasSponsor    = in_array($paymentMethod, ['sha', 'ncpwd', 'insurance_private', 'waiver', 'combination'], true);
+            $branchCode    = $visit->branch ? strtoupper(substr($visit->branch->name, 0, 3)) : 'HQ';
+            $invYear       = now()->format('Y');
+            $invMonth      = now()->format('m');
+            $invSeq        = Invoice::whereYear('created_at', $invYear)
+                ->whereMonth('created_at', $invMonth)
+                ->count() + 1;
+            $invoiceNumber = "{$branchCode}/INV/{$invYear}/{$invMonth}/"
+                             . str_pad($invSeq, 4, '0', STR_PAD_LEFT);
+
+            $invoice = Invoice::create([
+                'visit_id'        => $visit->id,
+                'client_id'       => $client->id,
+                'branch_id'       => $visit->branch_id,
+                'invoice_number'  => $invoiceNumber,
+                'payment_pathway' => $paymentMethod,
+                'status'          => 'pending',
+                'generated_by'    => Auth::id(),
+                'notes'           => $sr['payment_notes'] ?? null,
+                'total_amount'    => 0,
+                'subtotal'        => 0,
+                'covered_amount'  => 0,
+                'balance_due'     => 0,
+            ]);
+
+            $clientRatio = match ($paymentMethod) {
+                'sha'               => 0.20,
+                'ncpwd'             => 0.10,
+                'waiver'            => 0.00,
+                'insurance_private' => 0.30,
+                'combination'       => 0.50,
+                default             => 1.00,
+            };
+
+            $total = $totalCovered = $totalClient = 0.0;
+
+            $bookings = ServiceBooking::where('visit_id', $visit->id)
+                ->where('notes', 'intake-editor')
+                ->with('service')
+                ->get();
+
+            foreach ($bookings as $booking) {
+                $base       = (float) ($booking->service?->base_price ?? 0);
+                $clientPays = round($base * $clientRatio, 2);
+                $covered    = round($base - $clientPays, 2);
+
+                InvoiceItem::create([
+                    'invoice_id'              => $invoice->id,
+                    'service_booking_id'      => $booking->id,
+                    'service_id'              => $booking->service_id,
+                    'department_id'           => $booking->department_id,
+                    'item_description'        => $booking->service?->name ?? 'Service',
+                    'quantity'                => 1,
+                    'unit_price'              => $base,
+                    'subtotal'                => $base,
+                    'total'                   => $base,
+                    'covered_amount'          => $covered,
+                    'insurance_covered_amount' => $covered,
+                    'client_copay_amount'     => $clientPays,
+                ]);
+
+                $total        += $base;
+                $totalCovered += $covered;
+                $totalClient  += $clientPays;
+            }
+
+            $invoice->update([
+                'subtotal'       => $total,
+                'total_amount'   => $total,
+                'covered_amount' => $totalCovered,
+                'balance_due'    => $totalClient,
+            ]);
+
+            // ── Mark finalized ────────────────────────────────────────────
+            $intake->update([
+                'assessed_by'  => Auth::id(),
+                'is_finalized' => true,
+                'finalized_at' => now(),
+            ]);
+
+            // ── Route visit ───────────────────────────────────────────────
+            $visit->completeStage();
+            if ($hasSponsor) {
+                $visit->moveToStage('billing');
+                $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
+            } else {
+                $visit->moveToStage('payment');
+                $routeLabel = 'Cashier — KES ' . number_format($totalClient, 2);
+            }
+
+            Notification::make()->success()
+                ->title('Intake Finalized')
+                ->body("{$client->full_name} → {$routeLabel}. Invoice #{$invoiceNumber} created.")
+                ->send();
+        });
+
+        $this->redirect(route('filament.admin.resources.intake-queues.index'));
+    }
 }

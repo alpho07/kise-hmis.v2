@@ -15,17 +15,21 @@ class InvoiceItem extends Model
         'service_booking_id',
         'service_id',
         'department_id',
+        'item_description',
         'description',
         'quantity',
         'unit_price',
         'subtotal',
         'discount_amount',
+        'discount',
+        'covered_amount',
+        'total',
         'tax_amount',
         'insurance_provider_id',
         'insurance_covered_amount',
         'client_copay_amount',
-        
-        // ✅ ADDED: Sponsor/Client Split Columns
+
+        // Sponsor/Client split columns (added by later migrations if present)
         'sponsor_type',
         'sponsor_percentage',
         'sponsor_amount',
