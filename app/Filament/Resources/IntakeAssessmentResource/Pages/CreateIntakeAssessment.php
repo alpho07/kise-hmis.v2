@@ -320,6 +320,26 @@ class CreateIntakeAssessment extends CreateRecord
                 'nutrition_notes'      => $data['feeding_nutrition_notes'] ?? null,
             ], fn($v) => $v !== null && $v !== [] && $v !== '');
 
+            $perinatHistory = array_filter([
+                'pregnancy_complications' => $periComplications ?: null,
+                'place_of_birth'          => $placeOfBirth,
+                'mode_of_delivery'        => $data['peri_mode_of_delivery']   ?? null,
+                'gestation_weeks'         => $data['peri_gestation_weeks']    ?? null,
+                'birth_weight_kg'         => $data['peri_birth_weight_kg']    ?? null,
+                'neonatal_care'           => $neonatalCare ?: null,
+                'early_medical_issues'    => $earlyMedical ?: null,
+                'developmental_concerns'  => $devConcerns ?: null,
+            ], fn($v) => $v !== null && $v !== []);
+
+            $immunizationRecords = array_filter([
+                'epi_status'                 => $data['imm_epi_status']                   ?? [],
+                'epi_card_seen'              => $data['imm_epi_card_seen']                ?? null,
+                'missed_doses'               => $data['imm_missed_doses']                 ?? null,
+                'missed_doses_which'         => $data['imm_missed_doses_which']           ?? null,
+                'recent_illness_post_vaccine'=> $data['imm_recent_illness_post_vaccine']  ?? null,
+                'recent_illness_notes'       => $data['imm_recent_illness_notes']         ?? null,
+            ], fn($v) => $v !== null && $v !== []);
+
             ClientMedicalHistory::updateOrCreate(
                 ['client_id' => $client->id],
                 [
@@ -342,6 +362,8 @@ class CreateIntakeAssessment extends CreateRecord
                     'developmental_concerns_notes'=> $data['developmental_history']      ?? null,
                     'assistive_devices_history'   => $data['e2_previous_devices']        ?? [],
                     'assistive_devices_notes'     => null,
+                    'perinatal_history'           => $perinatHistory ?: null,
+                    'immunization_records'        => $immunizationRecords ?: null,
                 ]
             );
 
@@ -758,7 +780,7 @@ class CreateIntakeAssessment extends CreateRecord
                 $visit->moveToStage('billing');
                 $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
             } else {
-                $visit->moveToStage('cashier');
+                $visit->moveToStage('queue');
                 $routeLabel = 'Cashier — KES ' . number_format($totalClientAmount, 2) . ' to collect';
             }
 

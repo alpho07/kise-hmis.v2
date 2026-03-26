@@ -75,7 +75,7 @@ class ClientProfileHub extends Page
                         'invoices.payments',
                         'queueEntries',
                     ])
-                    ->whereIn('status', ['checked_in', 'in_progress'])
+                    ->whereIn('status', ['checked_in', 'in_progress', 'in_triage', 'in_intake', 'awaiting_payment', 'in_queue', 'in_service'])
                     ->latest()
                     ->first();
             }

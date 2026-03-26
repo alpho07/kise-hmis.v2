@@ -139,6 +139,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
         if ($med?->feeding_history) {
             $feedingHistory = is_array($med->feeding_history) ? $med->feeding_history : [];
         }
+        $peri = $med?->perinatal_history ?? [];
         $this->sectionData['E'] = [
             'med_medical_conditions'        => $med?->medical_conditions ?? [],
             'med_current_medications'       => $med?->current_medications,
@@ -146,7 +147,15 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'med_family_medical_history'    => $med?->family_medical_history,
             'med_immunization_status'       => $med?->immunization_status,
             'med_previous_assessments'      => $med?->previous_assessments ?? [],
-            'peri_developmental_concerns'   => $med?->developmental_concerns ?? [],
+            // E3 — Perinatal History
+            'peri_pregnancy_complications'  => $peri['pregnancy_complications'] ?? [],
+            'peri_place_of_birth'           => $peri['place_of_birth']          ?? null,
+            'peri_mode_of_delivery'         => $peri['mode_of_delivery']        ?? null,
+            'peri_gestation_weeks'          => $peri['gestation_weeks']         ?? null,
+            'peri_birth_weight_kg'          => $peri['birth_weight_kg']         ?? null,
+            'peri_neonatal_care'            => $peri['neonatal_care']           ?? [],
+            'peri_early_medical_issues'     => $peri['early_medical_issues']    ?? [],
+            'peri_developmental_concerns'   => $peri['developmental_concerns']  ?? [],
             'developmental_history'         => $med?->developmental_concerns_notes,
             // E2 — Assistive Technology
             'e2_has_at'                     => !empty($disability?->assistive_technology) ? 'yes' : null,
@@ -590,6 +599,42 @@ class IntakeAssessmentEditor extends Page implements HasForms
             );
         }
 
+        $periComplications = $data['peri_pregnancy_complications'] ?? [];
+        if (!empty($data['peri_pregnancy_complications_other'])) {
+            $periComplications = array_map(
+                fn($v) => $v === 'other' ? 'other: ' . $data['peri_pregnancy_complications_other'] : $v,
+                $periComplications
+            );
+        }
+        $neonatalCare = $data['peri_neonatal_care'] ?? [];
+        if (!empty($data['peri_neonatal_care_other'])) {
+            $neonatalCare = array_map(
+                fn($v) => $v === 'other' ? 'other: ' . $data['peri_neonatal_care_other'] : $v,
+                $neonatalCare
+            );
+        }
+        $earlyMedical = $data['peri_early_medical_issues'] ?? [];
+        if (!empty($data['peri_early_medical_issues_other'])) {
+            $earlyMedical = array_map(
+                fn($v) => $v === 'other' ? 'other: ' . $data['peri_early_medical_issues_other'] : $v,
+                $earlyMedical
+            );
+        }
+        $placeOfBirth = ($data['peri_place_of_birth'] ?? null) === 'other'
+            ? 'other: ' . ($data['peri_place_of_birth_other'] ?? 'unspecified')
+            : ($data['peri_place_of_birth'] ?? null);
+
+        $perinatHistory = array_filter([
+            'pregnancy_complications' => $periComplications ?: null,
+            'place_of_birth'          => $placeOfBirth,
+            'mode_of_delivery'        => $data['peri_mode_of_delivery']  ?? null,
+            'gestation_weeks'         => $data['peri_gestation_weeks']   ?? null,
+            'birth_weight_kg'         => $data['peri_birth_weight_kg']   ?? null,
+            'neonatal_care'           => $neonatalCare ?: null,
+            'early_medical_issues'    => $earlyMedical ?: null,
+            'developmental_concerns'  => $devConcerns ?: null,
+        ], fn($v) => $v !== null && $v !== []);
+
         ClientMedicalHistory::updateOrCreate(
             ['client_id' => $this->client->id],
             [
@@ -603,6 +648,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'developmental_concerns'       => $devConcerns,
                 'developmental_concerns_notes' => $data['developmental_history']      ?? null,
                 'assistive_devices_history'    => $data['e2_previous_devices']        ?? [],
+                'perinatal_history'            => $perinatHistory ?: null,
             ]
         );
     }
@@ -861,6 +907,9 @@ class IntakeAssessmentEditor extends Page implements HasForms
                     'quantity'       => 1,
                     'unit_price'     => $service->base_price ?? 0,
                     'total_price'    => $service->base_price ?? 0,
+                    'booking_date'   => today(),
+                    'payment_status' => 'pending',
+                    'service_status' => 'scheduled',
                     'status'         => 'pending',
                     'booked_by'      => Auth::id(),
                     'notes'          => 'intake-editor',
@@ -958,7 +1007,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 $visit->moveToStage('billing');
                 $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
             } else {
-                $visit->moveToStage('payment');
+                $visit->moveToStage('queue');
                 $routeLabel = 'Cashier — KES ' . number_format($totalClient, 2);
             }
 

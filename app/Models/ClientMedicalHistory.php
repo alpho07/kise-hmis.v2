@@ -28,7 +28,8 @@ class ClientMedicalHistory extends Model
         'immunization_status',
         'feeding_history',
         'family_medical_history',
-        'feeding_history',
+        'perinatal_history',
+        'immunization_records',
     ];
 
     protected $casts = [
@@ -37,6 +38,8 @@ class ClientMedicalHistory extends Model
         'developmental_concerns' => 'array',
         'assistive_devices_history' => 'array',
         'feeding_history' => 'array',
+        'perinatal_history' => 'array',
+        'immunization_records' => 'array',
     ];
 
     public function client(): BelongsTo

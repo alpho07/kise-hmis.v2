@@ -69,8 +69,7 @@ public function todayServiceRequests()
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return true;
-        //return $this->is_active && $this->hasVerifiedEmail();
+        return (bool) $this->is_active;
     }
 
     /**

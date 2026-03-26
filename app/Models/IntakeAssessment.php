@@ -32,14 +32,13 @@ class IntakeAssessment extends Model
         'services_required',
         'functional_screening_scores',
         'intake_summary',
+        'assessment_summary',
         'recommendations',
         'assessed_by',
         'priority_level',
         'section_status',
         'is_finalized',
         'finalized_at',
-        'functional_screening_scores',
-        'services_required',
     ];
 
     protected $casts = [

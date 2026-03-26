@@ -1009,7 +1009,7 @@ class IntakeAssessmentResource extends Resource
                 ->label('Other Support Source — Specify')
                 ->placeholder('Specify…')
                 ->columnSpanFull()
-                ->visible(fn(Get $get) => \in_array('other', $get('socio_source_of_support') ?? [], true)),
+                ->visible(fn(Get $get) => \in_array('other', (array)($get('socio_source_of_support') ?? []), true)),
 
             Forms\Components\Select::make('socio_primary_language')
                 ->label('Primary Language')
@@ -1097,8 +1097,8 @@ class IntakeAssessmentResource extends Resource
                     Forms\Components\TextInput::make('med_conditions_other')
                         ->label('Other Conditions — Specify')
                         ->placeholder('Describe other known condition(s)…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('med_medical_conditions') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('med_medical_conditions') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('med_medical_conditions') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('med_medical_conditions') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\Textarea::make('med_current_medications')
@@ -1144,8 +1144,8 @@ class IntakeAssessmentResource extends Resource
                     Forms\Components\TextInput::make('med_previous_assessments_other')
                         ->label('Other Previous Assessment — Specify')
                         ->placeholder('Describe other assessment or service received…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('med_previous_assessments') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('med_previous_assessments') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('med_previous_assessments') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('med_previous_assessments') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\Radio::make('med_has_at_history')
@@ -1189,8 +1189,8 @@ class IntakeAssessmentResource extends Resource
                             Forms\Components\TextInput::make('allergen_other')
                                 ->label('Other Allergen — Specify')
                                 ->placeholder('Describe the specific allergen…')
-                                ->visible(fn(Get $get) => \in_array('other', $get('allergen_names') ?? [], true))
-                                ->required(fn(Get $get) => \in_array('other', $get('allergen_names') ?? [], true)),
+                                ->visible(fn(Get $get) => \in_array('other', (array)($get('allergen_names') ?? []), true))
+                                ->required(fn(Get $get) => \in_array('other', (array)($get('allergen_names') ?? []), true)),
 
                             Forms\Components\CheckboxList::make('reactions')
                                 ->label('Typical Reactions')
@@ -1522,16 +1522,26 @@ class IntakeAssessmentResource extends Resource
                             'substance_exposure'=> 'Substance exposure',
                             'other'             => 'Other (specify)',
                         ])
+                        ->default([])
                         ->columns(3)
                         ->live()
+                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                            $state = is_array($state) ? $state : [];
+                            if (in_array('none', $state, true) && count($state) > 1) {
+                                $set('peri_pregnancy_complications', ['none']);
+                            }
+                        })
+                        ->disableOptionWhen(fn(string $value, Get $get): bool =>
+                            $value !== 'none' && in_array('none', (array)($get('peri_pregnancy_complications') ?? []), true)
+                        )
                         ->helperText('Caregiver-reported only.')
                         ->columnSpanFull(),
 
                     Forms\Components\TextInput::make('peri_pregnancy_complications_other')
                         ->label('Pregnancy Complications — Specify')
                         ->placeholder('Describe other complication…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('peri_pregnancy_complications') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('peri_pregnancy_complications') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('peri_pregnancy_complications') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('peri_pregnancy_complications') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\Select::make('peri_place_of_birth')
@@ -1582,15 +1592,25 @@ class IntakeAssessmentResource extends Resource
                             'phototherapy'=> 'Phototherapy',
                             'other'       => 'Other (specify)',
                         ])
+                        ->default([])
                         ->columns(3)
                         ->live()
+                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                            $state = is_array($state) ? $state : [];
+                            if (in_array('none', $state, true) && count($state) > 1) {
+                                $set('peri_neonatal_care', ['none']);
+                            }
+                        })
+                        ->disableOptionWhen(fn(string $value, Get $get): bool =>
+                            $value !== 'none' && in_array('none', (array)($get('peri_neonatal_care') ?? []), true)
+                        )
                         ->columnSpanFull(),
 
                     Forms\Components\TextInput::make('peri_neonatal_care_other')
                         ->label('Neonatal Care — Specify')
                         ->placeholder('Describe other neonatal care received…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('peri_neonatal_care') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('peri_neonatal_care') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('peri_neonatal_care') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('peri_neonatal_care') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\CheckboxList::make('peri_early_medical_issues')
@@ -1603,15 +1623,25 @@ class IntakeAssessmentResource extends Resource
                             'none'              => 'None',
                             'other'             => 'Other (specify)',
                         ])
+                        ->default([])
                         ->columns(3)
                         ->live()
+                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                            $state = is_array($state) ? $state : [];
+                            if (in_array('none', $state, true) && count($state) > 1) {
+                                $set('peri_early_medical_issues', ['none']);
+                            }
+                        })
+                        ->disableOptionWhen(fn(string $value, Get $get): bool =>
+                            $value !== 'none' && in_array('none', (array)($get('peri_early_medical_issues') ?? []), true)
+                        )
                         ->columnSpanFull(),
 
                     Forms\Components\TextInput::make('peri_early_medical_issues_other')
                         ->label('Early Medical Issues — Specify')
                         ->placeholder('Describe other early medical issue…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('peri_early_medical_issues') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('peri_early_medical_issues') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('peri_early_medical_issues') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('peri_early_medical_issues') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\CheckboxList::make('peri_developmental_concerns')
@@ -1627,16 +1657,26 @@ class IntakeAssessmentResource extends Resource
                             'none'      => 'None',
                             'other'     => 'Other (specify)',
                         ])
+                        ->default([])
                         ->columns(3)
                         ->live()
+                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                            $state = is_array($state) ? $state : [];
+                            if (in_array('none', $state, true) && count($state) > 1) {
+                                $set('peri_developmental_concerns', ['none']);
+                            }
+                        })
+                        ->disableOptionWhen(fn(string $value, Get $get): bool =>
+                            $value !== 'none' && in_array('none', (array)($get('peri_developmental_concerns') ?? []), true)
+                        )
                         ->helperText('Quick flags only.')
                         ->columnSpanFull(),
 
                     Forms\Components\TextInput::make('peri_developmental_concerns_other')
                         ->label('Developmental Concerns — Specify')
                         ->placeholder('Describe other developmental concern…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('peri_developmental_concerns') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('peri_developmental_concerns') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('peri_developmental_concerns') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('peri_developmental_concerns') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\Textarea::make('developmental_history')
@@ -1675,6 +1715,7 @@ class IntakeAssessmentResource extends Resource
                     Forms\Components\CheckboxList::make('imm_epi_status')
                         ->label('EPI Vaccines Received (card or caregiver)')
                         ->options([
+                            'none'            => 'None received / Unknown',
                             'bcg'             => 'BCG',
                             'opv'             => 'OPV',
                             'pentavalent'     => 'Pentavalent',
@@ -1685,8 +1726,24 @@ class IntakeAssessmentResource extends Resource
                             'hpv'             => 'HPV (≥9 yrs)',
                             'td'              => 'Tetanus-Diphtheria (adolescents)',
                         ])
+                        ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) {
+                                $component->state([]);
+                            }
+                        })
                         ->columns(3)
-                        ->helperText('Kenya EPI context — intake does not interpret, records only.')
+                        ->live()
+                        ->afterStateUpdated(function (mixed $state, Set $set): void {
+                            $state = is_array($state) ? $state : [];
+                            if (in_array('none', $state, true) && count($state) > 1) {
+                                $set('imm_epi_status', ['none']);
+                            }
+                        })
+                        ->disableOptionWhen(fn(string $value, Get $get): bool =>
+                            $value !== 'none' && in_array('none', (array)($get('imm_epi_status') ?? []), true)
+                        )
+                        ->helperText('Selecting "None received / Unknown" clears all other selections. Kenya EPI context — intake does not interpret, records only.')
                         ->columnSpanFull(),
 
                     Forms\Components\Radio::make('imm_missed_doses')
@@ -1776,8 +1833,8 @@ class IntakeAssessmentResource extends Resource
                     Forms\Components\TextInput::make('feeding_swallowing_concerns_other')
                         ->label('Feeding / Swallowing Concern — Specify')
                         ->placeholder('Describe other concern…')
-                        ->visible(fn(Get $get) => \in_array('other', $get('feeding_swallowing_concerns') ?? [], true))
-                        ->required(fn(Get $get) => \in_array('other', $get('feeding_swallowing_concerns') ?? [], true))
+                        ->visible(fn(Get $get) => \in_array('other', (array)($get('feeding_swallowing_concerns') ?? []), true))
+                        ->required(fn(Get $get) => \in_array('other', (array)($get('feeding_swallowing_concerns') ?? []), true))
                         ->columnSpanFull(),
 
                     Forms\Components\Radio::make('feeding_growth_concern')
@@ -1967,8 +2024,8 @@ class IntakeAssessmentResource extends Resource
             Forms\Components\TextInput::make('referral_source_other')
                 ->label('Referral Source — Specify')
                 ->placeholder('Name the other referral source…')
-                ->required(fn(Get $get) => in_array('other', $get('referral_source') ?? [], true))
-                ->visible(fn(Get $get) => in_array('other', $get('referral_source') ?? [], true))
+                ->required(fn(Get $get) => in_array('other', (array)($get('referral_source') ?? []), true))
+                ->visible(fn(Get $get) => in_array('other', (array)($get('referral_source') ?? []), true))
                 ->columnSpanFull(),
 
             Forms\Components\TextInput::make('referral_contact')
