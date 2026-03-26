@@ -22,12 +22,20 @@ class ServicePointDashboardResource extends Resource
     protected static ?string $navigationGroup = 'Service Delivery';
     protected static ?int $navigationSort = 1;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin', 'admin', 'service_provider']);
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            //->whereDate('joined_at', today())
+            ->whereDate('joined_at', today())
             ->where('status', 'waiting')
-           // ->where('department_id', auth()->user()->department_id ?? null)
+            ->when(
+                auth()->user()->department_id ?? null,
+                fn($q) => $q->where('department_id', auth()->user()->department_id)
+            )
             ->with(['visit', 'client', 'service', 'department'])
             ->orderBy('priority_level', 'asc')
             ->orderBy('queue_number', 'asc');

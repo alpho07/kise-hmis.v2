@@ -18,6 +18,12 @@ class WardResource extends Resource
     protected static ?string $model = Ward::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationGroup = 'Geo-location Management';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin','admin']);
+    }
 
     public static function form(Form $form): Form
     {

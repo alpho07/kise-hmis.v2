@@ -44,6 +44,15 @@ class DynamicAssessmentResource extends Resource
     
     protected static ?int $navigationSort = 2;
 
+     public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    public  function getTitle(): string{
+        return request()->query('form_slug', 'intake-assessment') ??'';
+    }
+
     public static function form(Form $form): Form
     {
         return $form

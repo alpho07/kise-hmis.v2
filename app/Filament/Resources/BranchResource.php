@@ -34,6 +34,11 @@ class BranchResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin', 'admin']);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -154,8 +159,8 @@ class BranchResource extends Resource
                             ->preload()
                             ->native(false)
                             ->live()
-                            ->afterStateUpdated(fn (Set $set) => $set('ward_id', null))
-                            ->disabled(fn (Get $get): bool => !$get('county_id'))
+                            ->afterStateUpdated(fn(Set $set) => $set('ward_id', null))
+                            ->disabled(fn(Get $get): bool => !$get('county_id'))
                             ->columnSpan(1),
 
                         Forms\Components\Select::make('ward_id')
@@ -173,7 +178,7 @@ class BranchResource extends Resource
                             ->searchable()
                             ->preload()
                             ->native(false)
-                            ->disabled(fn (Get $get): bool => !$get('sub_county_id'))
+                            ->disabled(fn(Get $get): bool => !$get('sub_county_id'))
                             ->columnSpan(1),
 
                         Forms\Components\TextInput::make('latitude')
@@ -291,7 +296,7 @@ class BranchResource extends Resource
                         'success' => 'satellite',
                         'info' => 'outreach',
                     ])
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'main' => 'Main HQ',
                         'satellite' => 'Satellite',
                         'outreach' => 'Outreach',
@@ -386,14 +391,14 @@ class BranchResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->action(fn ($records) => $records->each->update(['is_active' => true])),
+                        ->action(fn($records) => $records->each->update(['is_active' => true])),
 
                     Tables\Actions\BulkAction::make('deactivate')
                         ->label('Deactivate Selected')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
-                        ->action(fn ($records) => $records->each->update(['is_active' => false])),
+                        ->action(fn($records) => $records->each->update(['is_active' => false])),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
@@ -420,7 +425,7 @@ class BranchResource extends Resource
 
                                 Infolists\Components\TextEntry::make('type')
                                     ->badge()
-                                    ->color(fn (string $state): string => match ($state) {
+                                    ->color(fn(string $state): string => match ($state) {
                                         'main' => 'primary',
                                         'satellite' => 'success',
                                         'outreach' => 'info',
@@ -515,15 +520,15 @@ class BranchResource extends Resource
                             ->schema([
                                 Infolists\Components\TextEntry::make('departments_count')
                                     ->label('Departments')
-                                    ->state(fn ($record) => $record->departments()->count()),
+                                    ->state(fn($record) => $record->departments()->count()),
 
                                 Infolists\Components\TextEntry::make('users_count')
                                     ->label('Staff Members')
-                                    ->state(fn ($record) => $record->users()->count()),
+                                    ->state(fn($record) => $record->users()->count()),
 
                                 Infolists\Components\TextEntry::make('visits_count')
                                     ->label('Total Visits')
-                                    ->state(fn ($record) => $record->visits()->count()),
+                                    ->state(fn($record) => $record->visits()->count()),
                             ]),
                     ]),
             ]);

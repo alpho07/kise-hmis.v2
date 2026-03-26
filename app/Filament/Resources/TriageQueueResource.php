@@ -26,6 +26,11 @@ class TriageQueueResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+      public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin','admin','triage_nurse']);
+    }
+
     public static function form(Form $form): Form
     {
         // Form handled by TriageResource
@@ -259,7 +264,7 @@ class TriageQueueResource extends Resource
         return static::getModel()::where('current_stage', 'triage')
             ->whereDate('check_in_time', today())
             ->whereNull('check_out_time')
-            ->count();
+            ->count() ?: null;
     }
 
     public static function getNavigationBadgeColor(): ?string

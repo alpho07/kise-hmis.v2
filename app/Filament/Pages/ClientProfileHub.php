@@ -2,65 +2,69 @@
 
 namespace App\Filament\Pages;
 
-use Livewire\Attributes\Url;
-use App\Models\Client;
-use App\Models\Visit;
-use App\Models\ServiceBooking;
-use App\Models\ServiceRequest;
-use App\Models\Service;
 use App\Models\Appointment;
-use App\Models\InternalReferral;
+use App\Models\Client;
+use App\Models\ClientDisability;
+use App\Models\ClientEducation;
+use App\Models\ClientMedicalHistory;
+use App\Models\ClientSocioDemographic;
 use App\Models\ExternalReferral;
-use Filament\Pages\Page;
+use App\Models\IntakeAssessment;
+use App\Models\InternalReferral;
+use App\Models\SchoolPlacement;
+use App\Models\Service;
+use App\Models\ServiceRequest;
+use App\Models\Visit;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
+use Filament\Pages\Page;
 use Filament\Support\Enums\MaxWidth;
 use Illuminate\Support\Facades\DB;
 
 class ClientProfileHub extends Page
 {
     protected static string $view = 'filament.pages.client-profile-hub';
-    
+
     protected static bool $shouldRegisterNavigation = false;
-    
+
     protected static ?string $title = 'Client Profile Hub';
-    
-    // Use Livewire URL property binding
+
     #[\Livewire\Attributes\Url]
     public ?int $clientId = null;
-    
+
     #[\Livewire\Attributes\Url]
     public ?int $visitId = null;
-    
+
+    #[\Livewire\Attributes\Url(as: 'tab')]
+    public string $activeTab = 'overview';
+
     public ?Client $client = null;
     public ?Visit $activeVisit = null;
-    public string $activeTab = 'overview';
-    
+
     // Form states
     public ?array $newServiceData = null;
     public ?array $appointmentData = null;
     public ?array $internalReferralData = null;
-    
+
     public function mount(): void
     {
+        if ($this->clientId) {
+            $this->client = Client::with([
+                'county', 'subCounty', 'ward',
+                'contacts', 'addresses', 'insurances.insuranceProvider',
+                'allergies',
+            ])->findOrFail($this->clientId);
 
-       
-        if (request()->get('clientId')) {
-            $this->client = Client::findOrFail(request()->get('clientId'));
-          
-            
-            // Get active visit or specific visit
-            if (request()->get('visitId')) {
+            if ($this->visitId) {
                 $this->activeVisit = Visit::with([
                     'triage',
                     'intakeAssessment',
                     'serviceBookings.service.department',
                     'serviceRequests.service',
                     'invoices.payments',
-                    'queueEntries.queue',
-                ])->findOrFail(request()->get('visitId'));
-                  dd($this->activeVisit);
+                    'queueEntries',
+                ])->findOrFail($this->visitId);
             } else {
                 $this->activeVisit = $this->client->visits()
                     ->with([
@@ -69,7 +73,7 @@ class ClientProfileHub extends Page
                         'serviceBookings.service.department',
                         'serviceRequests.service',
                         'invoices.payments',
-                        'queueEntries.queue',
+                        'queueEntries',
                     ])
                     ->whereIn('status', ['checked_in', 'in_progress'])
                     ->latest()
@@ -77,474 +81,406 @@ class ClientProfileHub extends Page
             }
         }
     }
-    
-    public function getMaxWidth(): MaxWidth | string
+
+    public function getMaxWidth(): MaxWidth|string
     {
         return MaxWidth::Full;
     }
-    
+
     public function getTitle(): string
     {
-        return $this->client 
-            ? "{$this->client->full_name} - Profile Hub"
+        return $this->client
+            ? "{$this->client->full_name} — Profile Hub"
             : 'Client Profile Hub';
     }
-    
+
+    public function setActiveTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+    }
+
     // ==========================================
     // COMPUTED PROPERTIES
     // ==========================================
-    
+
     public function getDemographicsProperty(): array
     {
         $primaryContact = $this->client->contacts->firstWhere('is_primary', true);
         $primaryAddress = $this->client->addresses->firstWhere('is_primary', true);
-        
+
         return [
             'basic' => [
                 'UCI' => $this->client->uci,
                 'Full Name' => $this->client->full_name,
-                'Date of Birth' => $this->client->date_of_birth?->format('M d, Y'),
-                'Age' => $this->client->date_of_birth?->age . ' years',
+                'Date of Birth' => $this->client->date_of_birth?->format('M d, Y') ?? 'N/A',
+                'Age' => ($this->client->estimated_age ?? $this->client->date_of_birth?->age ?? '—') . ' yrs',
                 'Gender' => ucfirst($this->client->gender ?? 'Not specified'),
-                'ID Number' => $this->client->id_number ?? 'N/A',
-                'Passport' => $this->client->passport_number ?? 'N/A',
+                'National ID' => $this->client->national_id ?? 'N/A',
+                'Birth Certificate' => $this->client->birth_certificate_number ?? 'N/A',
+                'NCPWD No.' => $this->client->ncpwd_number ?? 'N/A',
+                'SHA No.' => $this->client->sha_number ?? 'N/A',
             ],
             'contact' => [
-                'Phone' => $primaryContact?->contact_value ?? 'N/A',
-                'Email' => $this->client->contacts->firstWhere('contact_type', 'email')?->contact_value ?? 'N/A',
-                'Alternative Phone' => $this->client->contacts
-                    ->where('contact_type', 'phone')
-                    ->where('is_primary', false)
-                    ->first()?->contact_value ?? 'N/A',
+                'Primary Phone' => $this->client->phone_primary ?? 'N/A',
+                'Secondary Phone' => $this->client->phone_secondary ?? 'N/A',
+                'Email' => $this->client->email ?? 'N/A',
+                'Guardian Name' => $this->client->guardian_name ?? 'N/A',
+                'Guardian Phone' => $this->client->guardian_phone ?? 'N/A',
+                'Relationship' => $this->client->guardian_relationship ?? 'N/A',
             ],
             'address' => [
-                'County' => $primaryAddress?->county?->name ?? 'N/A',
-                'Sub-County' => $primaryAddress?->subCounty?->name ?? 'N/A',
-                'Ward' => $primaryAddress?->ward?->name ?? 'N/A',
-                'Street Address' => $primaryAddress?->street_address ?? 'N/A',
-                'Postal Code' => $primaryAddress?->postal_code ?? 'N/A',
+                'County' => $this->client->county?->name ?? $primaryAddress?->county?->name ?? 'N/A',
+                'Sub-County' => $this->client->subCounty?->name ?? $primaryAddress?->subCounty?->name ?? 'N/A',
+                'Ward' => $this->client->ward?->name ?? $primaryAddress?->ward?->name ?? 'N/A',
+                'Village' => $this->client->village ?? 'N/A',
+                'Landmark' => $this->client->landmark ?? 'N/A',
+                'Primary Address' => $this->client->primary_address ?? 'N/A',
             ],
-            'emergency' => [
-                'Emergency Contact' => $this->client->contacts->firstWhere('contact_type', 'emergency_contact')?->contact_value ?? 'N/A',
-                'Emergency Relationship' => $this->client->contacts->firstWhere('contact_type', 'emergency_contact')?->notes ?? 'N/A',
-            ]
         ];
     }
-    
+
     public function getActiveInsurancesProperty()
     {
         return $this->client->insurances()
             ->with('insuranceProvider')
-            ->where('is_active', true)
-            ->where(function($q) {
-                $q->whereNull('valid_until')
-                  ->orWhere('valid_until', '>=', now());
-            })
-            ->get()
-            ->map(fn($insurance) => [
-                'Provider' => $insurance->insuranceProvider->name,
-                'Member Number' => $insurance->member_number,
-                'Coverage Type' => ucfirst(str_replace('_', ' ', $insurance->coverage_type ?? 'standard')),
-                'Valid From' => $insurance->valid_from?->format('M d, Y'),
-                'Valid Until' => $insurance->valid_until?->format('M d, Y') ?? 'No expiry',
-                'Status' => '✓ Active',
-            ]);
+            ->valid()
+            ->get();
     }
-    
-    public function getDisabilitiesProperty()
+
+    public function getDisabilityProperty(): ?ClientDisability
     {
-        return $this->client->disabilities()
-            ->get()
-            ->map(fn($disability) => [
-                'Type' => ucfirst(str_replace('_', ' ', $disability->disability_type)),
-                'Severity' => ucfirst($disability->severity ?? 'Not specified'),
-                'Description' => $disability->description,
-                'Diagnosed Date' => $disability->diagnosed_date?->format('M d, Y'),
-                'Support Needed' => $disability->support_needed ? 'Yes' : 'No',
-            ]);
+        return ClientDisability::where('client_id', $this->client->id)->first();
     }
-    
+
     public function getAllergiesProperty()
     {
-        return $this->client->allergies()
-            ->get()
-            ->map(fn($allergy) => [
-                'Allergen' => $allergy->allergen,
-                'Type' => ucfirst($allergy->allergy_type ?? 'unknown'),
-                'Severity' => ucfirst($allergy->severity ?? 'unknown'),
-                'Reaction' => $allergy->reaction,
-                'Notes' => $allergy->notes,
-            ]);
+        return $this->client->allergies;
     }
-    
-    public function getMedicalHistoriesProperty()
+
+    public function getMedicalHistoryProperty(): ?ClientMedicalHistory
     {
-        return $this->client->medicalHistories()
-            ->latest('diagnosed_date')
-            ->get()
-            ->map(fn($history) => [
-                'Condition' => $history->condition_name,
-                'Type' => ucfirst(str_replace('_', ' ', $history->condition_type ?? 'other')),
-                'Diagnosed' => $history->diagnosed_date?->format('M d, Y'),
-                'Status' => ucfirst($history->status ?? 'active'),
-                'Treatment' => $history->treatment,
-                'Notes' => $history->notes,
-            ]);
+        return ClientMedicalHistory::where('client_id', $this->client->id)->first();
     }
-    
+
+    public function getSocioDemographicProperty(): ?ClientSocioDemographic
+    {
+        return ClientSocioDemographic::where('client_id', $this->client->id)->first();
+    }
+
+    public function getEducationProperty(): ?ClientEducation
+    {
+        return ClientEducation::where('client_id', $this->client->id)->first();
+    }
+
+    public function getSchoolPlacementsProperty()
+    {
+        return SchoolPlacement::where('client_id', $this->client->id)
+            ->with(['school', 'placementOfficer'])
+            ->latest('admission_date')
+            ->get();
+    }
+
     public function getCurrentVisitTriageProperty(): ?array
     {
-        if (!$this->activeVisit?->triage) {
+        if (! $this->activeVisit?->triage) {
             return null;
         }
-        
+
         $triage = $this->activeVisit->triage;
-        
+
+        $bp = ($triage->systolic_bp && $triage->diastolic_bp)
+            ? "{$triage->systolic_bp}/{$triage->diastolic_bp} mmHg"
+            : null;
+
         return [
-            'vital_signs' => [
-                'Blood Pressure' => $triage->blood_pressure ?? 'N/A',
-                'Heart Rate' => $triage->heart_rate ? $triage->heart_rate . ' bpm' : 'N/A',
-                'Temperature' => $triage->temperature ? $triage->temperature . ' °C' : 'N/A',
-                'Respiratory Rate' => $triage->respiratory_rate ? $triage->respiratory_rate . ' /min' : 'N/A',
-                'Oxygen Saturation' => $triage->oxygen_saturation ? $triage->oxygen_saturation . ' %' : 'N/A',
-                'Weight' => $triage->weight ? $triage->weight . ' kg' : 'N/A',
-                'Height' => $triage->height ? $triage->height . ' cm' : 'N/A',
-                'BMI' => $triage->bmi ?? 'N/A',
-            ],
+            'vital_signs' => array_filter([
+                'Blood Pressure' => $bp,
+                'Heart Rate' => $triage->heart_rate ? $triage->heart_rate . ' bpm' : null,
+                'Temperature' => $triage->temperature ? $triage->temperature . ' °C' : null,
+                'Respiratory Rate' => $triage->respiratory_rate ? $triage->respiratory_rate . ' /min' : null,
+                'Oxygen Saturation' => $triage->oxygen_saturation ? $triage->oxygen_saturation . '%' : null,
+                'Weight' => $triage->weight ? $triage->weight . ' kg' : null,
+                'Height' => $triage->height ? $triage->height . ' cm' : null,
+                'BMI' => $triage->bmi ?? null,
+            ]),
             'assessment' => [
-                'Priority Level' => ucfirst($triage->priority_level ?? 'routine'),
-                'Chief Complaint' => $triage->chief_complaint ?? 'N/A',
+                'Chief Complaint' => $triage->presenting_complaint ?? $triage->chief_complaint ?? 'N/A',
                 'Pain Scale' => $triage->pain_scale ? $triage->pain_scale . '/10' : 'N/A',
-                'Red Flags' => $triage->redFlags->pluck('flag_description')->implode(', ') ?: 'None',
+                'Risk Level' => ucfirst($triage->risk_level ?? 'routine'),
             ],
-            'nurse' => [
-                'Triaged By' => $triage->user?->name ?? 'N/A',
-                'Triaged At' => $triage->created_at?->format('M d, Y H:i'),
-            ]
+            'nurse' => $triage->triagedBy?->name ?? 'N/A',
+            'triaged_at' => $triage->triaged_at?->format('M d, Y H:i') ?? $triage->created_at?->format('M d, Y H:i'),
+            'notes' => $triage->triage_notes ?? null,
         ];
     }
-    
+
     public function getCurrentVisitIntakeProperty(): ?array
     {
-        if (!$this->activeVisit?->intakeAssessment) {
+        if (! $this->activeVisit?->intakeAssessment) {
             return null;
         }
-        
+
         $intake = $this->activeVisit->intakeAssessment;
-        
+
         return [
-            'assessment' => [
-                'Presenting Problem' => $intake->presenting_problem ?? 'N/A',
-                'History of Present Illness' => $intake->history_present_illness ?? 'N/A',
-                'Assessment Type' => ucfirst(str_replace('_', ' ', $intake->assessment_type ?? 'standard')),
-                'Risk Level' => ucfirst($intake->risk_level ?? 'low'),
-            ],
-            'recommendations' => [
-                'Services Recommended' => $intake->recommendations ?? 'N/A',
-                'Priority' => ucfirst($intake->priority ?? 'routine'),
-                'Special Instructions' => $intake->special_instructions ?? 'None',
-            ],
-            'officer' => [
-                'Assessed By' => $intake->user?->name ?? 'N/A',
-                'Assessed At' => $intake->created_at?->format('M d, Y H:i'),
-            ]
+            'presenting_problem' => $intake->presenting_problem ?? null,
+            'history_present_illness' => $intake->history_present_illness ?? null,
+            'assessment_type' => ucfirst(str_replace('_', ' ', $intake->assessment_type ?? 'standard')),
+            'risk_level' => ucfirst($intake->risk_level ?? 'low'),
+            'recommendations' => $intake->recommendations ?? null,
+            'priority' => ucfirst($intake->priority_level ?? $intake->priority ?? 'routine'),
+            'special_instructions' => $intake->special_instructions ?? null,
+            'officer' => $intake->assessedBy?->name ?? 'N/A',
+            'assessed_at' => $intake->assessed_at?->format('M d, Y H:i') ?? $intake->created_at?->format('M d, Y H:i'),
         ];
     }
-    
+
     public function getCurrentServicesProperty()
     {
-        if (!$this->activeVisit) {
+        if (! $this->activeVisit) {
             return collect();
         }
-        
-        // Combine both ServiceBookings and ServiceRequests
-        $bookings = $this->activeVisit->serviceBookings()
-            ->with(['service.department', 'queueEntry', 'provider'])
+
+        return $this->activeVisit->serviceBookings()
+            ->with(['service.department', 'queueEntry'])
             ->get()
-            ->map(fn($booking) => [
-                'id' => $booking->id,
-                'type' => 'booking',
-                'Service' => $booking->service->name,
-                'Department' => $booking->service->department?->name ?? 'N/A',
-                'Status' => ucfirst(str_replace('_', ' ', $booking->service_status ?? 'scheduled')),
-                'Queue Status' => $booking->queueEntry 
+            ->map(fn ($booking) => [
+                'service_name' => $booking->service->name ?? 'Unknown',
+                'department' => $booking->service->department?->name ?? 'N/A',
+                'status' => ucfirst(str_replace('_', ' ', $booking->service_status ?? 'scheduled')),
+                'queue_status' => $booking->queueEntry
                     ? ucfirst(str_replace('_', ' ', $booking->queueEntry->status))
                     : 'Not in queue',
-                'Queue Position' => $booking->queueEntry?->queue_number ?? 'N/A',
-                'Provider' => $booking->provider?->name ?? 'Not assigned',
-                'Source' => 'Initial Intake',
+                'queue_number' => $booking->queueEntry?->queue_number ?? '—',
+                'priority' => $booking->priority ?? 'routine',
             ]);
-            
-        $requests = $this->activeVisit->serviceRequests()
-            ->with(['service.department', 'requestedBy'])
-            ->get()
-            ->map(fn($request) => [
-                'id' => $request->id,
-                'type' => 'request',
-                'Service' => $request->service->name,
-                'Department' => $request->service->department?->name ?? 'N/A',
-                'Status' => ucfirst(str_replace('_', ' ', $request->status)),
-                'Queue Status' => $request->status === 'paid' ? 'In queue' : 'Awaiting payment',
-                'Queue Position' => $request->serviceBooking?->queueEntry?->queue_number ?? 'N/A',
-                'Provider' => $request->requestedBy?->name ?? 'N/A',
-                'Source' => 'Mid-Journey Request',
-            ]);
-            
-        return $bookings->merge($requests);
     }
-    
+
+    public function getLatestIntakeProperty(): ?IntakeAssessment
+    {
+        return IntakeAssessment::where('client_id', $this->client->id)
+            ->with(['assessedBy'])
+            ->latest()
+            ->first();
+    }
+
+    public function getIntakeHistoryProperty()
+    {
+        return IntakeAssessment::where('client_id', $this->client->id)
+            ->with(['visit', 'assessedBy'])
+            ->latest()
+            ->limit(30)
+            ->get();
+    }
+
     public function getVisitHistoryProperty()
     {
         return $this->client->visits()
-            ->with(['triage', 'intakeAssessment', 'serviceBookings', 'invoices'])
+            ->with([
+                'serviceBookings.service.department',
+                'invoices.payments',
+                'triage',
+                'intakeAssessment.assessedBy',
+            ])
             ->where('id', '!=', $this->activeVisit?->id)
             ->latest('check_in_time')
             ->limit(20)
-            ->get()
-            ->map(fn($visit) => [
-                'id' => $visit->id,
-                'Date' => $visit->check_in_time?->format('M d, Y H:i'),
-                'Type' => ucfirst(str_replace('_', ' ', $visit->visit_type ?? 'walk_in')),
-                'Status' => ucfirst($visit->status),
-                'Services' => $visit->serviceBookings->count(),
-                'Total Amount' => 'KES ' . number_format($visit->invoices->sum('total_amount'), 2),
-                'Paid Amount' => 'KES ' . number_format($visit->invoices->sum('paid_amount'), 2),
-            ]);
+            ->get();
     }
-    
+
     public function getUpcomingAppointmentsProperty()
     {
-        return Appointment::query()
-            ->where('client_id', $this->client->id)
+        return Appointment::where('client_id', $this->client->id)
             ->whereIn('status', ['scheduled', 'confirmed'])
             ->where('appointment_date', '>=', now())
             ->with(['service', 'department', 'provider'])
             ->orderBy('appointment_date')
             ->limit(10)
-            ->get()
-            ->map(fn($apt) => [
-                'id' => $apt->id,
-                'Date' => $apt->appointment_date->format('M d, Y'),
-                'Time' => $apt->appointment_time?->format('H:i') ?? 'Not set',
-                'Service' => $apt->service?->name ?? 'N/A',
-                'Department' => $apt->department?->name ?? 'N/A',
-                'Provider' => $apt->provider?->name ?? 'Not assigned',
-                'Status' => ucfirst($apt->status),
-                'Notes' => $apt->notes,
-            ]);
+            ->get();
     }
-    
+
     public function getPastAppointmentsProperty()
     {
-        return Appointment::query()
-            ->where('client_id', $this->client->id)
+        return Appointment::where('client_id', $this->client->id)
             ->where('appointment_date', '<', now())
-            ->with(['service', 'department', 'visit'])
             ->orderBy('appointment_date', 'desc')
-            ->limit(20)
-            ->get()
-            ->map(fn($apt) => [
-                'Date' => $apt->appointment_date->format('M d, Y'),
-                'Service' => $apt->service?->name ?? 'N/A',
-                'Status' => ucfirst($apt->status),
-                'Attended' => $apt->visit_id ? 'Yes' : 'No',
-            ]);
+            ->limit(15)
+            ->get();
     }
-    
+
     public function getInternalReferralsProperty()
     {
-        return InternalReferral::query()
-            ->where('client_id', $this->client->id)
+        return InternalReferral::where('client_id', $this->client->id)
             ->with(['fromDepartment', 'toDepartment', 'service', 'referringProvider'])
             ->latest()
-            ->limit(10)
-            ->get()
-            ->map(fn($ref) => [
-                'id' => $ref->id,
-                'Date' => $ref->created_at->format('M d, Y'),
-                'From' => $ref->fromDepartment?->name ?? 'N/A',
-                'To' => $ref->toDepartment?->name ?? 'N/A',
-                'Service' => $ref->service?->name ?? 'N/A',
-                'Referred By' => $ref->referringProvider?->name ?? 'N/A',
-                'Status' => ucfirst($ref->status),
-                'Reason' => $ref->reason,
-            ]);
+            ->limit(15)
+            ->get();
     }
-    
+
     public function getExternalReferralsProperty()
     {
-        return ExternalReferral::query()
-            ->where('client_id', $this->client->id)
+        return ExternalReferral::where('client_id', $this->client->id)
             ->with(['referringProvider'])
             ->latest()
-            ->limit(10)
-            ->get()
-            ->map(fn($ref) => [
-                'Date' => $ref->created_at->format('M d, Y'),
-                'Facility' => $ref->referred_to_facility,
-                'Specialty' => $ref->specialty,
-                'Referred By' => $ref->referringProvider?->name ?? 'N/A',
-                'Status' => ucfirst($ref->status),
-                'Urgency' => ucfirst($ref->urgency_level ?? 'routine'),
-            ]);
+            ->limit(15)
+            ->get();
     }
-    
+
+    // Assessment service links — categories with URLs to specific resource pages
+    public function getAssessmentLinksProperty(): array
+    {
+        return [
+            [
+                'label' => 'Audiology / Hearing',
+                'icon' => 'heroicon-o-musical-note',
+                'color' => 'info',
+                'description' => 'Hearing assessments, audiometry & hearing aid fitting',
+                'url' => $this->activeVisit
+                    ? route('filament.admin.resources.visits.view', $this->activeVisit->id) . '#audiology'
+                    : null,
+            ],
+            [
+                'label' => 'Optometry / Vision',
+                'icon' => 'heroicon-o-eye',
+                'color' => 'primary',
+                'description' => 'Vision screening, refraction & low vision',
+                'url' => null,
+            ],
+            [
+                'label' => 'Physiotherapy',
+                'icon' => 'heroicon-o-bolt',
+                'color' => 'success',
+                'description' => 'Motor rehabilitation, mobility & physical therapy',
+                'url' => null,
+            ],
+            [
+                'label' => 'Occupational Therapy',
+                'icon' => 'heroicon-o-hand-raised',
+                'color' => 'warning',
+                'description' => 'Daily living skills, fine motor & sensory integration',
+                'url' => null,
+            ],
+            [
+                'label' => 'Speech & Language',
+                'icon' => 'heroicon-o-chat-bubble-left-right',
+                'color' => 'purple',
+                'description' => 'Communication, AAC & feeding therapy',
+                'url' => null,
+            ],
+            [
+                'label' => 'Psychology',
+                'icon' => 'heroicon-o-light-bulb',
+                'color' => 'rose',
+                'description' => 'Psychological assessments, counselling & behaviour support',
+                'url' => null,
+            ],
+            [
+                'label' => 'Social Work',
+                'icon' => 'heroicon-o-users',
+                'color' => 'orange',
+                'description' => 'Psychosocial support, family & community linkage',
+                'url' => null,
+            ],
+            [
+                'label' => 'Special Education',
+                'icon' => 'heroicon-o-academic-cap',
+                'color' => 'teal',
+                'description' => 'Educational assessments & school readiness',
+                'url' => null,
+            ],
+        ];
+    }
+
     // ==========================================
     // FORMS
     // ==========================================
-    
-    public function requestNewServiceForm(): Form
+
+    protected function getForms(): array
     {
-        return Form::make()
+        return [
+            'requestNewServiceForm',
+            'createAppointmentForm',
+        ];
+    }
+
+    public function requestNewServiceForm(Form $form): Form
+    {
+        return $form
             ->schema([
-                Forms\Components\Section::make('Request Additional Services')
-                    ->description('Select services to add to the current visit. Client must pay before service delivery.')
-                    ->schema([
-                        Forms\Components\Select::make('service_ids')
-                            ->label('Services')
-                            ->multiple()
-                            ->searchable()
-                            ->preload()
-                            ->options(function() {
-                                return Service::query()
-                                    ->where('is_active', true)
-                                    ->where('branch_id', auth()->user()->branch_id)
-                                    ->pluck('name', 'id');
-                            })
-                            ->required()
-                            ->helperText('Select one or more services')
-                            ->columnSpanFull(),
-                            
-                        Forms\Components\Select::make('urgency_level')
-                            ->label('Urgency')
-                            ->options([
-                                'routine' => 'Routine',
-                                'urgent' => 'Urgent',
-                                'emergency' => 'Emergency',
-                            ])
-                            ->default('routine')
-                            ->required(),
-                            
-                        Forms\Components\Textarea::make('clinical_indication')
-                            ->label('Clinical Indication')
-                            ->rows(3)
-                            ->placeholder('Why is this service needed?')
-                            ->required()
-                            ->columnSpanFull(),
+                Forms\Components\Select::make('service_ids')
+                    ->label('Services')
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
+                    ->options(fn () => Service::where('is_active', true)
+                        ->pluck('name', 'id'))
+                    ->required()
+                    ->helperText('Select one or more services'),
+
+                Forms\Components\Select::make('urgency_level')
+                    ->label('Urgency')
+                    ->options([
+                        'routine' => 'Routine',
+                        'urgent' => 'Urgent',
+                        'emergency' => 'Emergency',
                     ])
+                    ->default('routine')
+                    ->required(),
+
+                Forms\Components\Textarea::make('clinical_indication')
+                    ->label('Clinical Indication')
+                    ->rows(3)
+                    ->placeholder('Why is this service needed?')
+                    ->required(),
             ])
             ->statePath('newServiceData');
     }
-    
-    public function createAppointmentForm(): Form
+
+    public function createAppointmentForm(Form $form): Form
     {
-        return Form::make()
+        return $form
             ->schema([
-                Forms\Components\Section::make('Book Appointment')
-                    ->schema([
-                        Forms\Components\DatePicker::make('appointment_date')
-                            ->label('Appointment Date')
-                            ->required()
-                            ->minDate(now())
-                            ->native(false),
-                            
-                        Forms\Components\TimePicker::make('appointment_time')
-                            ->label('Preferred Time')
-                            ->seconds(false)
-                            ->required(),
-                            
-                        Forms\Components\Select::make('service_id')
-                            ->label('Service')
-                            ->relationship('service', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->required(),
-                            
-                        Forms\Components\Select::make('department_id')
-                            ->label('Department')
-                            ->relationship('department', 'name')
-                            ->searchable()
-                            ->preload(),
-                            
-                        Forms\Components\Select::make('provider_id')
-                            ->label('Preferred Provider (Optional)')
-                            ->relationship('provider', 'name')
-                            ->searchable()
-                            ->preload(),
-                            
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Notes')
-                            ->rows(3)
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2)
+                Forms\Components\DatePicker::make('appointment_date')
+                    ->label('Date')
+                    ->required()
+                    ->minDate(now())
+                    ->native(false),
+
+                Forms\Components\TimePicker::make('appointment_time')
+                    ->label('Preferred Time')
+                    ->seconds(false)
+                    ->required(),
+
+                Forms\Components\Select::make('service_id')
+                    ->label('Service')
+                    ->options(fn () => Service::where('is_active', true)->pluck('name', 'id'))
+                    ->searchable()
+                    ->preload()
+                    ->required(),
+
+                Forms\Components\Textarea::make('notes')
+                    ->label('Notes')
+                    ->rows(2),
             ])
             ->statePath('appointmentData');
     }
-    
-    public function createInternalReferralForm(): Form
-    {
-        return Form::make()
-            ->schema([
-                Forms\Components\Section::make('Internal Referral')
-                    ->schema([
-                        Forms\Components\Select::make('to_department_id')
-                            ->label('Refer To Department')
-                            ->relationship('toDepartment', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->required(),
-                            
-                        Forms\Components\Select::make('service_id')
-                            ->label('Service Requested')
-                            ->relationship('service', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->required(),
-                            
-                        Forms\Components\Select::make('urgency_level')
-                            ->label('Urgency')
-                            ->options([
-                                'routine' => 'Routine',
-                                'urgent' => 'Urgent',
-                                'emergency' => 'Emergency',
-                            ])
-                            ->default('routine')
-                            ->required(),
-                            
-                        Forms\Components\Textarea::make('reason')
-                            ->label('Reason for Referral')
-                            ->rows(3)
-                            ->required()
-                            ->columnSpanFull(),
-                            
-                        Forms\Components\Textarea::make('clinical_notes')
-                            ->label('Clinical Notes')
-                            ->rows(3)
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2)
-            ])
-            ->statePath('internalReferralData');
-    }
-    
+
     // ==========================================
     // ACTIONS
     // ==========================================
-    
+
     public function requestNewService(): void
     {
-        if (!$this->activeVisit) {
-            Notification::make()
-                ->danger()
+        if (! $this->activeVisit) {
+            Notification::make()->danger()
                 ->title('No Active Visit')
                 ->body('Client must have an active visit to request services.')
                 ->send();
             return;
         }
-        
-        $data = $this->form->getState();
-        
+
+        $data = $this->requestNewServiceForm->getState();
+
         DB::beginTransaction();
         try {
             foreach ($data['service_ids'] as $serviceId) {
@@ -559,34 +495,26 @@ class ClientProfileHub extends Page
                     'clinical_indication' => $data['clinical_indication'],
                 ]);
             }
-            
             DB::commit();
-            
+
             $this->activeVisit->refresh();
-            
-            Notification::make()
-                ->success()
+            $this->requestNewServiceForm->fill();
+
+            Notification::make()->success()
                 ->title('Services Requested')
                 ->body(count($data['service_ids']) . ' service(s) requested. Client must visit Cashier for payment.')
                 ->send();
-                
-            $this->newServiceData = null;
-            
         } catch (\Exception $e) {
             DB::rollBack();
-            
-            Notification::make()
-                ->danger()
-                ->title('Request Failed')
-                ->body($e->getMessage())
-                ->send();
+            Notification::make()->danger()
+                ->title('Request Failed')->body($e->getMessage())->send();
         }
     }
-    
+
     public function createAppointment(): void
     {
-        $data = $this->appointmentData;
-        
+        $data = $this->createAppointmentForm->getState();
+
         DB::beginTransaction();
         try {
             Appointment::create([
@@ -594,103 +522,29 @@ class ClientProfileHub extends Page
                 'appointment_date' => $data['appointment_date'],
                 'appointment_time' => $data['appointment_time'],
                 'service_id' => $data['service_id'],
-                'department_id' => $data['department_id'] ?? null,
-                'provider_id' => $data['provider_id'] ?? null,
                 'status' => 'scheduled',
                 'notes' => $data['notes'] ?? null,
                 'created_by' => auth()->id(),
             ]);
-            
             DB::commit();
-            
-            Notification::make()
-                ->success()
+
+            $this->createAppointmentForm->fill();
+
+            Notification::make()->success()
                 ->title('Appointment Booked')
                 ->body('Appointment scheduled successfully.')
                 ->send();
-                
-            $this->appointmentData = null;
-            
         } catch (\Exception $e) {
             DB::rollBack();
-            
-            Notification::make()
-                ->danger()
-                ->title('Booking Failed')
-                ->body($e->getMessage())
-                ->send();
+            Notification::make()->danger()
+                ->title('Booking Failed')->body($e->getMessage())->send();
         }
     }
-    
-    public function createInternalReferral(): void
-    {
-        if (!$this->activeVisit) {
-            Notification::make()
-                ->danger()
-                ->title('No Active Visit')
-                ->body('Client must have an active visit to create referrals.')
-                ->send();
-            return;
-        }
-        
-        $data = $this->internalReferralData;
-        
-        DB::beginTransaction();
-        try {
-            $referral = InternalReferral::create([
-                'visit_id' => $this->activeVisit->id,
-                'client_id' => $this->client->id,
-                'from_department_id' => auth()->user()->department_id,
-                'to_department_id' => $data['to_department_id'],
-                'service_id' => $data['service_id'],
-                'referring_provider_id' => auth()->id(),
-                'urgency_level' => $data['urgency_level'],
-                'reason' => $data['reason'],
-                'clinical_notes' => $data['clinical_notes'] ?? null,
-                'status' => 'pending',
-            ]);
-            
-            // Create service request automatically
-            ServiceRequest::create([
-                'visit_id' => $this->activeVisit->id,
-                'client_id' => $this->client->id,
-                'service_id' => $data['service_id'],
-                'requested_by' => auth()->id(),
-                'request_type' => 'internal_referral',
-                'status' => 'pending_payment',
-                'urgency_level' => $data['urgency_level'],
-                'clinical_indication' => $data['reason'],
-                'internal_referral_id' => $referral->id,
-            ]);
-            
-            DB::commit();
-            
-            Notification::make()
-                ->success()
-                ->title('Referral Created')
-                ->body('Internal referral created. Client must pay before proceeding.')
-                ->send();
-                
-            $this->internalReferralData = null;
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            Notification::make()
-                ->danger()
-                ->title('Referral Failed')
-                ->body($e->getMessage())
-                ->send();
-        }
-    }
-    
+
     public function refreshData(): void
     {
         $this->mount();
-        
-        Notification::make()
-            ->success()
-            ->title('Data Refreshed')
-            ->send();
+
+        Notification::make()->success()->title('Refreshed')->send();
     }
 }

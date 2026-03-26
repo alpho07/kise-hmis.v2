@@ -777,7 +777,16 @@ class IntakeAssessmentResource extends Resource
                 ->label('Preferred Communication')
                 ->options(['sms' => 'SMS', 'phone_call' => 'Phone Call', 'email' => 'Email', 'whatsapp' => 'WhatsApp'])
                 ->default(fn() => Visit::with('client')->find($visitId)?->client?->preferred_communication ?? 'sms')
-                ->native(false),
+                ->native(false)
+                ->live(),
+
+            Forms\Components\TextInput::make('b_email')
+                ->label('Email Address')
+                ->email()
+                ->prefixIcon('heroicon-o-envelope')
+                ->placeholder('client@example.com')
+                ->default(fn() => Visit::with('client')->find($visitId)?->client?->email)
+                ->visible(fn(Get $get) => $get('b_preferred_communication') === 'email'),
 
             Forms\Components\Toggle::make('b_consent_to_sms')
                 ->label('Consents to SMS Reminders')
@@ -2060,85 +2069,127 @@ class IntakeAssessmentResource extends Resource
 
     public static function sectionJSchema(?int $visitId = null): array
     {
+        $client = $visitId ? Visit::with('client')->find($visitId)?->client : null;
+        $hasSha   = !empty($client?->sha_number);
+        $hasNcpwd = !empty($client?->ncpwd_number);
+
         return [
+            // ── Enrolled schemes ──────────────────────────────────────────────────
+            Forms\Components\Placeholder::make('j_scheme_header')
+                ->hiddenLabel()
+                ->content(new HtmlString(
+                    '<p style="font-size:13px;font-weight:600;color:#374151;margin:0 0 4px;">Step 1 — Enrolled Schemes</p>'
+                    . '<p style="font-size:12px;color:#64748b;margin:0;">Tick all schemes the client is enrolled in. Auto-detected entries are pre-ticked from the client record.</p>'
+                ))
+                ->columnSpanFull(),
+
             Forms\Components\Toggle::make('sha_enrolled')
                 ->label('SHA Enrolled')
-                ->helperText('Social Health Authority')
+                ->helperText($hasSha ? '✓ SHA number detected on record' : 'Social Health Authority enrolment')
                 ->live(),
 
             Forms\Components\Toggle::make('ncpwd_covered')
                 ->label('NCPWD Cover Applicable')
-                ->helperText('National Council for Persons with Disabilities')
+                ->helperText($hasNcpwd ? '✓ NCPWD number detected on record' : 'National Council for Persons with Disabilities')
                 ->live(),
 
             Forms\Components\Toggle::make('has_private_insurance')
-                ->label('Has Private / Employer Insurance')
+                ->label('Private / Employer Insurance')
+                ->helperText('Tick if client holds an active private or employer health plan')
                 ->live(),
 
-            Forms\Components\Select::make('expected_payment_method')
-                ->label('Proposed Payment Pathway')
+            // ── Payment method radio cards ────────────────────────────────────────
+            Forms\Components\Placeholder::make('j_method_header')
+                ->hiddenLabel()
+                ->content(new HtmlString(
+                    '<p style="font-size:13px;font-weight:600;color:#374151;margin:8px 0 4px;">Step 2 — Primary Payment Method</p>'
+                    . '<p style="font-size:12px;color:#64748b;margin:0;">Select the method the client will use at billing. M-PESA can always override at the cashier window.</p>'
+                ))
+                ->columnSpanFull(),
+
+            Forms\Components\Radio::make('expected_payment_method')
+                ->label('Primary Payment Method')
+                ->hiddenLabel()
                 ->options([
-                    'sha'      => 'SHA (Social Health Authority)',
-                    'ncpwd'    => 'NCPWD',
-                    'ecitizen' => 'eCitizen',
-                    'insurance'=> 'Private Insurance',
-                    'cash'     => 'Out-of-Pocket (Cash / M-PESA)',
-                    'mixed'    => 'Multiple / Hybrid',
+                    'sha'       => 'SHA — Social Health Authority',
+                    'ncpwd'     => 'NCPWD — Disability Subsidy',
+                    'insurance' => 'Private / Employer Insurance',
+                    'mpesa'     => 'M-PESA (Mobile Money)',
+                    'cash'      => 'Cash (Counter Payment)',
+                    'ecitizen'  => 'eCitizen Portal',
+                    'mixed'     => 'Hybrid / Multiple Methods',
                 ])
-                ->native(false)
+                ->descriptions([
+                    'sha'       => 'Covered by SHA enrolment — verify card or number at billing',
+                    'ncpwd'     => 'Subsidised via NCPWD disability card — card must be sighted',
+                    'insurance' => 'Billed to private or employer insurance — provide policy details',
+                    'mpesa'     => 'Client pays via M-PESA at cashier — no eligibility documents needed',
+                    'cash'      => 'Client pays cash at the cashier window',
+                    'ecitizen'  => 'Government eCitizen portal payment — confirm reference at cashier',
+                    'mixed'     => 'Combination of SHA, NCPWD, insurance and/or out-of-pocket',
+                ])
                 ->live()
-                ->required(),
+                ->required()
+                ->columnSpanFull(),
 
+            // ── Eligibility status ────────────────────────────────────────────────
             Forms\Components\Placeholder::make('j_eligibility_status')
-                ->label('Eligibility Status (pre-check)')
+                ->label('Eligibility Status')
                 ->content(function (Get $get): HtmlString {
-                    $method  = $get('expected_payment_method');
-                    $sha     = (bool) $get('sha_enrolled');
-                    $ncpwd   = (bool) $get('ncpwd_covered');
-                    $insure  = (bool) $get('has_private_insurance');
+                    $method = $get('expected_payment_method');
+                    $sha    = (bool) $get('sha_enrolled');
+                    $ncpwd  = (bool) $get('ncpwd_covered');
+                    $insure = (bool) $get('has_private_insurance');
 
-                    [$status, $color, $note] = match ($method) {
-                        'sha'      => $sha
-                            ? ['Eligible', '#16a34a', 'SHA enrolment confirmed.']
-                            : ['Unknown',  '#d97706', 'SHA enrolment not confirmed — verify before billing.'],
-                        'ncpwd'    => $ncpwd
-                            ? ['Eligible', '#16a34a', 'NCPWD cover noted — card must be sighted by billing.']
-                            : ['Unknown',  '#d97706', 'NCPWD cover not confirmed — verify card at billing.'],
-                        'insurance'=> $insure
-                            ? ['Eligible', '#16a34a', 'Private insurance noted — verify policy at billing.']
-                            : ['Unknown',  '#d97706', 'Private insurance not confirmed.'],
-                        'ecitizen' => ['Eligible',     '#16a34a', 'eCitizen payment — confirm transaction at cashier.'],
-                        'cash'     => ['Eligible',     '#16a34a', 'Out-of-pocket — no eligibility documents required.'],
-                        'mixed'    => ['Unknown',      '#d97706', 'Hybrid pathway — Payment Admin will verify each component.'],
-                        default    => ['Unknown',      '#94a3b8', 'Select a payment pathway above.'],
+                    [$badge, $bg, $text, $note] = match ($method) {
+                        'sha'       => $sha
+                            ? ['✓ Eligible',  '#dcfce7', '#15803d', 'SHA enrolment confirmed — ready for billing.']
+                            : ['⚠ Unconfirmed','#fef9c3', '#92400e', 'SHA enrolment not confirmed — verify card or number before billing.'],
+                        'ncpwd'     => $ncpwd
+                            ? ['✓ Eligible',  '#dcfce7', '#15803d', 'NCPWD cover noted — card must be sighted by the billing clerk.']
+                            : ['⚠ Unconfirmed','#fef9c3', '#92400e', 'NCPWD cover not confirmed — verify card at billing.'],
+                        'insurance' => $insure
+                            ? ['✓ Eligible',  '#dcfce7', '#15803d', 'Private insurance noted — provide policy number and card to billing.']
+                            : ['⚠ Unconfirmed','#fef9c3', '#92400e', 'Private insurance not confirmed — tick the toggle above if applicable.'],
+                        'mpesa'     => ['✓ Ready',    '#f0fdf4', '#15803d', 'M-PESA payment — client pays at cashier using their mobile number.'],
+                        'cash'      => ['✓ Ready',    '#f0fdf4', '#15803d', 'Cash payment — no eligibility documents required.'],
+                        'ecitizen'  => ['✓ Ready',    '#f0fdf4', '#15803d', 'eCitizen payment — confirm transaction reference at cashier.'],
+                        'mixed'     => ['ℹ Review',   '#eff6ff', '#1d4ed8', 'Hybrid pathway — Payment Admin will verify each component at billing.'],
+                        default     => ['— Pending',  '#f8fafc', '#94a3b8', 'Select a payment method above to see eligibility guidance.'],
                     };
 
                     return new HtmlString(
-                        "<span style='display:inline-block;padding:4px 10px;border-radius:999px;background:{$color};color:#fff;font-size:12px;font-weight:700;'>{$status}</span>"
-                        . "<span style='margin-left:8px;font-size:12px;color:#475569;'>{$note}</span>"
+                        "<div style='padding:10px 14px;background:{$bg};border-radius:8px;border:1px solid {$bg};display:flex;align-items:flex-start;gap:10px;'>"
+                        . "<span style='font-weight:700;color:{$text};font-size:12px;white-space:nowrap;'>{$badge}</span>"
+                        . "<span style='font-size:12px;color:#475569;line-height:1.5;'>{$note}</span>"
+                        . "</div>"
                     );
                 }),
 
+            // ── Documents required ────────────────────────────────────────────────
             Forms\Components\Placeholder::make('j_documents_required')
-                ->label('Documents Required')
+                ->label('Documents to Bring')
                 ->content(function (Get $get): HtmlString {
                     $method = $get('expected_payment_method');
                     $docs = match ($method) {
-                        'sha'      => ['SHA registration card or number', 'National ID of subscriber'],
-                        'ncpwd'    => ['NCPWD card (original or certified copy)', 'National ID'],
-                        'insurance'=> ['Insurance card', 'Policy / member number', 'Pre-authorisation letter (if required)'],
-                        'ecitizen' => ['National ID / Birth Certificate', 'eCitizen account reference'],
-                        'cash'     => ['No additional documents required'],
-                        'mixed'    => ['Documents per each pathway component — Payment Admin will advise'],
-                        default    => ['Select a pathway to see required documents'],
+                        'sha'       => ['SHA card or registration number', 'National ID of principal member'],
+                        'ncpwd'     => ['NCPWD card (original or certified copy)', 'National ID or passport'],
+                        'insurance' => ['Insurance card / certificate', 'Policy or member number', 'Pre-authorisation letter (if required by insurer)'],
+                        'mpesa'     => ['National ID or passport', 'Phone with M-PESA access'],
+                        'cash'      => ['No additional documents required'],
+                        'ecitizen'  => ['National ID or Birth Certificate', 'eCitizen account reference or receipt'],
+                        'mixed'     => ['Documents per each pathway — Payment Admin will advise at billing'],
+                        default     => ['Select a payment method above'],
                     };
-                    $items = implode('', array_map(fn($d) => "<li style='margin:2px 0;'>{$d}</li>", $docs));
-                    return new HtmlString("<ul style='margin:0;padding-left:16px;font-size:12px;color:#374151;'>{$items}</ul>");
+                    $items = implode('', array_map(fn($d) => "<li style='margin:3px 0;color:#374151;'>{$d}</li>", $docs));
+                    return new HtmlString(
+                        "<ul style='margin:0;padding-left:18px;font-size:12px;line-height:1.6;'>{$items}</ul>"
+                    );
                 }),
 
             Forms\Components\Textarea::make('payment_notes')
-                ->label('Payment Notes for Admin')
-                ->placeholder('Documentation status, special arrangements, eligibility notes…')
+                ->label('Notes for Payment Admin')
+                ->placeholder('Document status, exemption notes, special arrangements…')
                 ->rows(2)
                 ->columnSpanFull(),
         ];
@@ -2350,11 +2401,10 @@ class IntakeAssessmentResource extends Resource
                               <div style="margin-top:4px;font-size:11px;">'.now()->format('d M Y').'</div>
                             </div>
                           </div>
-                          <div style="background:#f8fafc;padding:12px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+                          <div style="background:#f8fafc;padding:12px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
                             <div><div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Age / Gender</div><div style="font-size:14px;font-weight:600;color:#1e293b;">'.$age.' yrs / '.strtoupper(substr($gender,0,1)).'</div></div>
                             <div><div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:2px;">Phone</div><div style="font-size:13px;color:#1e293b;">'.$phone.'</div></div>
-                            <div><div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:2px;">SHA #</div><div style="font-size:13px;color:#1e293b;">'.$sha.'</div></div>
-                            <div><div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:2px;">NCPWD #</div><div style="font-size:13px;color:#1e293b;">'.$ncpwd.'</div></div>
+                            <div><div style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600;margin-bottom:2px;">SHA #</div><div style="font-size:13px;color:'.(($client->sha_number ?? null) ? '#0d9488' : '#94a3b8').';font-weight:'.($client->sha_number ? '600' : '400').'">'.$sha.'</div></div>
                           </div>
                           '.$presentingRow.'
                           '.$vitals.'

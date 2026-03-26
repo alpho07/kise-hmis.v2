@@ -17,8 +17,13 @@ class ServiceResource extends Resource
     protected static ?string $model = Service::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Settings';
+     protected static ?string $navigationGroup = 'System Setup';
     protected static ?string $navigationLabel = 'Services';
+
+       public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin','admin']);
+    }
 
     public static function form(Form $form): Form
     {

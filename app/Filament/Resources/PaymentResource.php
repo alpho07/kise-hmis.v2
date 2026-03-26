@@ -19,6 +19,11 @@ class PaymentResource extends Resource
     protected static ?string $navigationGroup = 'Financial';
     protected static ?int $navigationSort = 3;
 
+         public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin','admin','billing_officer']);
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

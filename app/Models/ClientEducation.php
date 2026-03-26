@@ -22,6 +22,10 @@ class ClientEducation extends Model
         'school_name',
         'grade_level',
         'currently_enrolled',
+        'attendance_challenges',
+        'attendance_notes',
+        'performance_concern',
+        'performance_notes',
         'employment_status',
         'occupation_type',
         'employer_name',
@@ -29,7 +33,9 @@ class ClientEducation extends Model
     ];
 
     protected $casts = [
-        'currently_enrolled' => 'boolean',
+        'currently_enrolled'   => 'boolean',
+        'attendance_challenges' => 'boolean',
+        'performance_concern'  => 'boolean',
     ];
 
     public function client(): BelongsTo

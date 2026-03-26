@@ -6,6 +6,7 @@ use App\Filament\Resources\BillingResource\Pages;
 use App\Models\Invoice;
 use App\Models\InsuranceClaim;
 use App\Services\InsuranceClaimService;
+use App\Services\PaymentRoutingService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -25,8 +26,13 @@ class BillingResource extends Resource
     protected static ?string $navigationLabel = 'Billing Admin';
     protected static ?string $modelLabel = 'Invoice';
     protected static ?string $pluralModelLabel = 'Billing Admin';
-    protected static ?string $navigationGroup = 'Financial Management';
+    protected static ?string $navigationGroup = 'Financial';
     protected static ?int $navigationSort = 2;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin', 'admin', 'billing_officer']);
+    }
 
     /**
      * Only show invoices that need billing admin attention
@@ -114,19 +120,19 @@ class BillingResource extends Resource
                 Tables\Columns\TextColumn::make('visit.client.uci')
                     ->label('Client No #')
                     ->searchable()
-                     ->weight('bold'),
+                    ->weight('bold'),
 
                 Tables\Columns\TextColumn::make('payment_method')
                     ->label('Payment Type')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'sha' => 'info',
                         'ncpwd' => 'success',
                         'insurance_private' => 'warning',
                         'waiver' => 'danger',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'sha' => 'SHA',
                         'ncpwd' => 'NCPWD',
                         'insurance_private' => 'Insurance',
@@ -211,7 +217,7 @@ class BillingResource extends Resource
 
                 Tables\Filters\Filter::make('has_sponsor')
                     ->label('Has Sponsor')
-                    ->query(fn (Builder $query): Builder => $query->where('has_sponsor', true)),
+                    ->query(fn(Builder $query): Builder => $query->where('has_sponsor', true)),
 
                 Tables\Filters\Filter::make('created_at')
                     ->form([
@@ -224,11 +230,11 @@ class BillingResource extends Resource
                         return $query
                             ->when(
                                 $data['created_from'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
                             )
                             ->when(
                                 $data['created_until'],
-                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                                fn(Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
             ])
@@ -238,8 +244,8 @@ class BillingResource extends Resource
                     ->label('View Split')
                     ->icon('heroicon-o-eye')
                     ->color('info')
-                    ->modalHeading(fn (Invoice $record) => 'Payment Breakdown - ' . $record->invoice_number)
-                    ->modalContent(fn (Invoice $record) => view('filament.components.payment-breakdown', [
+                    ->modalHeading(fn(Invoice $record) => 'Payment Breakdown - ' . $record->invoice_number)
+                    ->modalContent(fn(Invoice $record) => view('filament.components.payment-breakdown', [
                         'invoice' => $record,
                     ]))
                     ->modalSubmitAction(false)
@@ -250,12 +256,13 @@ class BillingResource extends Resource
                     ->label('Verify')
                     ->icon('heroicon-o-check-circle')
                     ->color('warning')
-                    ->visible(fn (Invoice $record) => $record->status === 'pending')
+                    ->visible(fn(Invoice $record) => $record->status === 'pending')
                     ->requiresConfirmation()
                     ->modalHeading('Verify Invoice')
-                    ->modalDescription(fn (Invoice $record) => 
+                    ->modalDescription(
+                        fn(Invoice $record) =>
                         "Verify eligibility and documentation for {$record->client->full_name}. " .
-                        "This confirms the client is eligible for {$record->payment_method} coverage."
+                            "This confirms the client is eligible for {$record->payment_method} coverage."
                     )
                     ->modalSubmitActionLabel('Verify Invoice')
                     ->form([
@@ -290,13 +297,14 @@ class BillingResource extends Resource
                     ->label('Approve & Route')
                     ->icon('heroicon-o-check-badge')
                     ->color('success')
-                    ->visible(fn (Invoice $record) => $record->status === 'verified')
+                    ->visible(fn(Invoice $record) => $record->status === 'verified')
                     ->requiresConfirmation()
                     ->modalHeading('Approve Invoice & Create Insurance Claim')
-                    ->modalDescription(fn (Invoice $record) => 
+                    ->modalDescription(
+                        fn(Invoice $record) =>
                         "Approve invoice and create insurance claim for {$record->client->full_name}. " .
-                        "Sponsor will cover KES " . number_format($record->total_sponsor_amount, 2) . ". " .
-                        "Client will be routed to cashier for KES " . number_format($record->total_client_amount, 2) . "."
+                            "Sponsor will cover KES " . number_format($record->total_sponsor_amount, 2) . ". " .
+                            "Client will be routed to cashier for KES " . number_format($record->total_client_amount, 2) . "."
                     )
                     ->modalSubmitActionLabel('Approve & Create Claim')
                     ->form([
@@ -341,21 +349,35 @@ class BillingResource extends Resource
                                     'current_stage_started_at' => now(),
                                 ]);
 
-                                $message = "Approved! Client routed to Cashier for KES " . 
-                                          number_format($record->total_client_amount, 2);
+                                $message = "Approved! Client routed to Cashier for KES " .
+                                    number_format($record->total_client_amount, 2);
                             } else {
                                 // Waiver or 100% covered - go straight to service
-                                $record->visit->update([
-                                    'current_stage' => 'service',
-                                    'current_stage_started_at' => now(),
-                                ]);
-
                                 $record->update([
                                     'payment_status' => 'paid',
                                     'client_payment_status' => 'waived',
+                                    'payment_verified_at' => now(),
                                 ]);
 
-                                $message = "Approved! 100% covered - Client routed to Service Point";
+                                $record->visit->update([
+                                    'current_stage' => 'service',
+                                    'current_stage_started_at' => now(),
+                                    'payment_verified_at' => now(),
+                                ]);
+
+                                // Create service queue entries since no cashier step needed
+                                $routingService = new PaymentRoutingService();
+                                $queueResult = $routingService->createServiceQueues($record->visit);
+
+                                if (!$queueResult['success']) {
+                                    \Log::error('Queue creation failed for 100%-covered invoice', [
+                                        'invoice_id' => $record->id,
+                                        'error' => $queueResult['error'] ?? 'Unknown error',
+                                    ]);
+                                }
+
+                                $message = "Approved! 100% covered — Client routed to Service Point"
+                                    . ($queueResult['success'] ? " ({$queueResult['queues_created']} queue(s) created)" : " (queue creation failed — add manually)");
                             }
 
                             Notification::make()
@@ -372,7 +394,7 @@ class BillingResource extends Resource
                     ->label('Reject')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
-                    ->visible(fn (Invoice $record) => in_array($record->status, ['pending', 'verified']))
+                    ->visible(fn(Invoice $record) => in_array($record->status, ['pending', 'verified']))
                     ->requiresConfirmation()
                     ->modalHeading('Reject Invoice')
                     ->modalDescription('This will reject the invoice and return the client to intake for correction.')
@@ -407,7 +429,7 @@ class BillingResource extends Resource
 
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make()
-                    ->visible(fn (Invoice $record) => $record->status === 'pending'),
+                    ->visible(fn(Invoice $record) => $record->status === 'pending'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -539,7 +561,8 @@ class BillingResource extends Resource
                             ->dateTime(),
                     ])
                     ->columns(2)
-                    ->visible(fn (Invoice $record) => 
+                    ->visible(
+                        fn(Invoice $record) =>
                         $record->verified_at || $record->approved_at
                     ),
             ]);

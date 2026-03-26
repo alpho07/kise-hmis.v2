@@ -6,8 +6,6 @@ use App\Filament\Resources\ServiceQueueResource\Pages;
 use App\Models\QueueEntry;
 use App\Models\ServiceBooking;
 use App\Models\AssessmentFormSchema;
-use App\Models\Invoice;
-use App\Models\ServiceRequest;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -27,13 +25,21 @@ class ServiceQueueResource extends Resource
     protected static ?string $modelLabel = 'Queue Entry';
     protected static ?string $pluralModelLabel = 'Service Queue';
     protected static ?string $navigationGroup = 'Service Delivery';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin', 'admin', 'service_provider']);
+    }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->whereIn('status', ['ready', 'in_service'])
-          //  ->where('department_id', auth()->user()->department_id) // Department-scoped
+            ->when(
+                auth()->user()->department_id ?? null,
+                fn($q) => $q->where('department_id', auth()->user()->department_id)
+            )
             ->with([
                 'client',
                 'visit',
@@ -281,10 +287,23 @@ class ServiceQueueResource extends Resource
                             ]);
                         }
 
+                        // If all queue entries for this visit are done, advance visit to completed
+                        $visit = $record->visit;
+                        $hasPending = QueueEntry::where('visit_id', $visit->id)
+                            ->where('id', '!=', $record->id)
+                            ->whereNotIn('status', ['completed', 'rescheduled'])
+                            ->exists();
+
+                        if (!$hasPending) {
+                            $visit->completeStage();
+                            $visit->moveToStage('completed');
+                        }
+
                         Notification::make()
                             ->success()
                             ->title('Service Completed')
-                            ->body("Queue #{$record->queue_number} has been completed.")
+                            ->body("Queue #{$record->queue_number} has been completed."
+                                . ($hasPending ? '' : ' Visit marked as completed.'))
                             ->send();
                     }),
 
@@ -559,12 +578,12 @@ class ServiceQueueResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $invoiceCount = Invoice::where('status', 'pending')->count(); 
-        $serviceRequestCount = ServiceRequest::where('status', 'pending_payment')->count();
-        
-        $total = $invoiceCount + $serviceRequestCount;
-        
-        return $total > 0 ? (string) $total : null;
+        return static::getModel()::whereIn('status', ['ready', 'in_service'])
+            ->when(
+                auth()->user()->department_id ?? null,
+                fn($q) => $q->where('department_id', auth()->user()->department_id)
+            )
+            ->count() ?: null;
     }
 
     public static function getNavigationBadgeColor(): ?string

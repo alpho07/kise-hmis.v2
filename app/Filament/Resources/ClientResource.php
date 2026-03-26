@@ -33,6 +33,11 @@ class ClientResource extends Resource
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'full_name';
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin', 'admin', 'receptionist']);
+    }
+
     public static function form(Form $form): Form
     {
         // Determine user role
@@ -40,7 +45,7 @@ class ClientResource extends Resource
         $isReception = auth()->user()->hasRole('receptionist');
         $isIntake = auth()->user()->hasRole('intake_officer');
         $isTriage = auth()->user()->hasRole('triage_nurse');
-        
+
         return $form
             ->schema([
                 // SECTION 0: BRANCH SELECTION (SUPER ADMIN ONLY)
@@ -53,7 +58,7 @@ class ClientResource extends Resource
                             ->label('Branch')
                             ->required()
                             ->options(Branch::active()->pluck('name', 'id'))
-                            ->default(fn () => auth()->user()->branch_id)
+                            ->default(fn() => auth()->user()->branch_id)
                             ->searchable()
                             ->preload()
                             ->native(false)
@@ -71,7 +76,7 @@ class ClientResource extends Resource
                     ->schema([
                         Forms\Components\Placeholder::make('uci_display')
                             ->label('UCI (Unique Client Identifier)')
-                            ->content(fn ($record) => $record?->uci ?? 'Will be auto-generated: KISE/A/000XXX/2025')
+                            ->content(fn($record) => $record?->uci ?? 'Will be auto-generated: KISE/A/000XXX/2025')
                             ->helperText('Format: KISE/A/000XXX/YEAR')
                             ->columnSpan(2),
 
@@ -84,7 +89,8 @@ class ClientResource extends Resource
                                     ->placeholder('e.g., John')
                                     ->prefixIcon('heroicon-o-user')
                                     ->helperText('Client\'s first name')
-                                    ->disabled(fn (string $operation, $record) => 
+                                    ->disabled(
+                                        fn(string $operation, $record) =>
                                         $operation === 'edit' && $record?->client_type === 'old_new' && !$isIntake && !$isSuperAdmin
                                     )
                                     ->columnSpan(1),
@@ -105,7 +111,8 @@ class ClientResource extends Resource
                                     ->placeholder('e.g., Doe')
                                     ->prefixIcon('heroicon-o-user')
                                     ->helperText('Client\'s surname/family name')
-                                    ->disabled(fn (string $operation, $record) => 
+                                    ->disabled(
+                                        fn(string $operation, $record) =>
                                         $operation === 'edit' && $record?->client_type === 'old_new' && !$isIntake && !$isSuperAdmin
                                     )
                                     ->columnSpan(1),
@@ -123,7 +130,8 @@ class ClientResource extends Resource
                             ->native(false)
                             ->prefixIcon('heroicon-o-user-circle')
                             ->helperText('Client\'s gender/sex')
-                            ->disabled(fn (string $operation, $record) => 
+                            ->disabled(
+                                fn(string $operation, $record) =>
                                 $operation === 'edit' && $record?->client_type === 'old_new' && !$isIntake && !$isSuperAdmin
                             )
                             ->columnSpan(1),
@@ -149,14 +157,15 @@ class ClientResource extends Resource
                             ->schema([
                                 Forms\Components\DatePicker::make('date_of_birth')
                                     ->label('Date of Birth')
-                                    ->required(fn (Get $get) => !$get('unknown_dob'))
+                                    ->required(fn(Get $get) => !$get('unknown_dob'))
                                     ->native(false)
                                     ->maxDate(now())
                                     ->displayFormat('d/m/Y')
                                     ->prefixIcon('heroicon-o-cake')
-                                    ->helperText(fn (Get $get) => $get('unknown_dob') 
-                                        ? 'Auto-calculated from estimated age' 
-                                        : 'Select client\'s actual date of birth'
+                                    ->helperText(
+                                        fn(Get $get) => $get('unknown_dob')
+                                            ? 'Auto-calculated from estimated age'
+                                            : 'Select client\'s actual date of birth'
                                     )
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (Set $set, ?string $state, Get $get) {
@@ -166,9 +175,10 @@ class ClientResource extends Resource
                                             $set('estimated_age', $age);
                                         }
                                     })
-                                    ->disabled(fn (Get $get, string $operation, $record) => 
-                                        $get('unknown_dob') || 
-                                        ($operation === 'edit' && $record?->client_type === 'old_new' && !$isIntake && !$isSuperAdmin)
+                                    ->disabled(
+                                        fn(Get $get, string $operation, $record) =>
+                                        $get('unknown_dob') ||
+                                            ($operation === 'edit' && $record?->client_type === 'old_new' && !$isIntake && !$isSuperAdmin)
                                     )
                                     ->dehydrated(true)
                                     ->columnSpan(1),
@@ -181,11 +191,12 @@ class ClientResource extends Resource
                                     ->maxValue(120)
                                     ->placeholder('e.g., 5')
                                     ->prefixIcon('heroicon-o-calendar')
-                                    ->helperText(fn (Get $get) => $get('unknown_dob') 
-                                        ? 'Enter estimated age in years (whole numbers only)' 
-                                        : 'Auto-calculated from date of birth'
+                                    ->helperText(
+                                        fn(Get $get) => $get('unknown_dob')
+                                            ? 'Enter estimated age in years (whole numbers only)'
+                                            : 'Auto-calculated from date of birth'
                                     )
-                                    ->required(fn (Get $get) => $get('unknown_dob'))
+                                    ->required(fn(Get $get) => $get('unknown_dob'))
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (Set $set, ?int $state, Get $get) {
                                         if ($state && $get('unknown_dob')) {
@@ -193,12 +204,12 @@ class ClientResource extends Resource
                                             $set('date_of_birth', $calculatedDob);
                                         }
                                     })
-                                    ->suffix(function (Get $get)  {
+                                    ->suffix(function (Get $get) {
                                         $age = $get('estimated_age');
                                         if (!$age) return '';
                                         return $age < 18 ? '(Child)' : '(Adult)';
                                     })
-                                    ->disabled(fn (Get $get) => !$get('unknown_dob'))
+                                    ->disabled(fn(Get $get) => !$get('unknown_dob'))
                                     ->dehydrated(true)
                                     ->columnSpan(1),
                             ])
@@ -209,7 +220,7 @@ class ClientResource extends Resource
                             ->content(function (Get $get) {
                                 $age = $get('estimated_age');
                                 if (!$age) return 'Enter DOB or Age to see category';
-                                
+
                                 if ($age < 2) return '👶 Infant (< 2 years)';
                                 if ($age < 5) return '🧒 Toddler (2-4 years)';
                                 if ($age < 13) return '👦 Child (5-12 years)';
@@ -225,8 +236,8 @@ class ClientResource extends Resource
                             ->placeholder('e.g., Jane Doe')
                             ->prefixIcon('heroicon-o-user-group')
                             ->helperText('Required for clients under 18 years')
-                            ->required(fn (Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
-                            ->visible(fn (Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
+                            ->required(fn(Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
+                            ->visible(fn(Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
                             ->columnSpan(1),
 
                         Forms\Components\TextInput::make('guardian_phone')
@@ -235,8 +246,8 @@ class ClientResource extends Resource
                             ->placeholder('e.g., 0712345678')
                             ->prefixIcon('heroicon-o-phone')
                             ->helperText('Primary contact for minor')
-                            ->required(fn (Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
-                            ->visible(fn (Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
+                            ->required(fn(Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
+                            ->visible(fn(Get $get) => $get('estimated_age') && $get('estimated_age') < 18)
                             ->columnSpan(1),
 
                         Forms\Components\TextInput::make('phone_primary')
@@ -245,8 +256,8 @@ class ClientResource extends Resource
                             ->placeholder('e.g., 0712345678')
                             ->prefixIcon('heroicon-o-phone')
                             ->helperText('Client\'s direct contact')
-                            ->required(fn (Get $get) => !$get('estimated_age') || $get('estimated_age') >= 18)
-                            ->visible(fn (Get $get) => !$get('estimated_age') || $get('estimated_age') >= 18)
+                            ->required(fn(Get $get) => !$get('estimated_age') || $get('estimated_age') >= 18)
+                            ->visible(fn(Get $get) => !$get('estimated_age') || $get('estimated_age') >= 18)
                             ->columnSpan(1),
                     ]),
             ]);
@@ -267,9 +278,9 @@ class ClientResource extends Resource
 
                 Tables\Columns\TextColumn::make('full_name')
                     ->label('Client Name')
-                    ->searchable(['first_name', 'last_name'])
+                    ->searchable(['first_name', 'last_name','phone_primary'])
                     ->sortable(['first_name', 'last_name'])
-                    ->description(fn (Client $record) => $record->phone_primary)
+                    ->description(fn(Client $record) => $record->phone_primary)
                     ->weight('semibold')
                     ->icon('heroicon-o-user'),
 
@@ -279,19 +290,38 @@ class ClientResource extends Resource
                     ->alignCenter()
                     ->sortable(),
 
-                Tables\Columns\BadgeColumn::make('gender')
-                    ->colors([
-                        'info' => 'male',
-                        'danger' => 'female',
-                    ])
-                    ->formatStateUsing(fn ($state) => ucfirst($state)),
+                Tables\Columns\TextColumn::make('client_type')
+                    ->label('Type')
+                    ->badge()
+                    ->color(fn($state) => match ($state) {
+                        'new'       => 'success',
+                        'old_new'   => 'warning',
+                        'returning' => 'primary',
+                        default     => 'gray',
+                    })
+                    ->formatStateUsing(fn($state) => match ($state) {
+                        'new'       => 'New',
+                        'old_new'   => 'Old-New',
+                        'returning' => 'Returning',
+                        default     => 'Unknown',
+                    })
+                    ->default('new'),
+
+                Tables\Columns\TextColumn::make('gender')
+                    ->badge()
+                    ->color(fn($state) => match ($state) {
+                        'male'   => 'info',
+                        'female' => 'danger',
+                        default  => 'gray',
+                    })
+                    ->formatStateUsing(fn($state) => ucfirst($state ?? '—')),
 
                 // ACTIVE VISIT STATUS COLUMN
                 Tables\Columns\TextColumn::make('activeVisit.current_stage')
                     ->label('Visit Status')
                     ->badge()
                     ->default('No Active Visit')
-                    ->color(fn ($state): string => match($state) {
+                    ->color(fn($state): string => match ($state) {
                         'reception' => 'gray',
                         'triage' => 'warning',
                         'intake' => 'primary',
@@ -300,13 +330,14 @@ class ClientResource extends Resource
                         'service_point' => 'success',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn ($state) => $state ? ucfirst(str_replace('_', ' ', $state)) : 'No Active Visit')
-                    ->description(fn (Client $record) => 
-                        $record->activeVisit 
+                    ->formatStateUsing(fn($state) => $state ? ucfirst(str_replace('_', ' ', $state)) : 'No Active Visit')
+                    ->description(
+                        fn(Client $record) =>
+                        $record->activeVisit
                             ? '🕐 ' . $record->activeVisit->check_in_time->format('h:i A') . ' • ' . $record->activeVisit->visit_number
                             : 'Ready for check-in'
                     )
-                    ->icon(fn ($state) => $state ? 'heroicon-o-clock' : 'heroicon-o-check-circle')
+                    ->icon(fn($state) => $state ? 'heroicon-o-clock' : 'heroicon-o-check-circle')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('ncpwd_number')
@@ -341,54 +372,70 @@ class ClientResource extends Resource
 
                 Tables\Filters\Filter::make('children')
                     ->label('Children Only')
-                    ->query(fn (Builder $query): Builder => $query->children()),
+                    ->query(fn(Builder $query): Builder => $query->children()),
 
                 Tables\Filters\Filter::make('adults')
                     ->label('Adults Only')
-                    ->query(fn (Builder $query): Builder => $query->adults()),
+                    ->query(fn(Builder $query): Builder => $query->adults()),
             ])
             ->actions([
                 // ============================================
                 // PRIMARY ACTION: START VISIT / VIEW VISIT
                 // ============================================
                 Tables\Actions\Action::make('start_visit')
-                    ->label(fn (Client $record) => 
-                        $record->hasActiveVisit() 
-                            ? 'Visit In Progress' 
+                    ->label(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
+                            ? 'Visit In Progress'
                             : 'Start Visit'
                     )
-                    ->icon(fn (Client $record) => 
-                        $record->hasActiveVisit() 
-                            ? 'heroicon-o-clock' 
+                    ->icon(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
+                            ? 'heroicon-o-clock'
                             : 'heroicon-o-play-circle'
                     )
-                    ->color(fn (Client $record) => 
-                        $record->hasActiveVisit() 
-                            ? 'warning' 
+                    ->color(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
+                            ? 'warning'
                             : 'success'
                     )
                     ->button()
-                    ->requiresConfirmation(fn (Client $record) => !$record->hasActiveVisit())
-                    ->modalHeading(fn (Client $record) => 
-                        $record->hasActiveVisit() 
-                            ? 'Visit In Progress' 
-                            : 'Start New Visit'
+                    ->requiresConfirmation(fn(Client $record) => !$record->hasActiveVisit())
+                    ->modalHeading(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
+                            ? 'Visit In Progress'
+                            : match ($record->client_type) {
+                                'returning' => "Sign In Returning Client",
+                                'old_new'   => "Sign In Old-New Client",
+                                default     => "Start New Visit",
+                            }
                     )
-                    ->modalDescription(fn (Client $record) => 
-                        $record->hasActiveVisit() 
-                            ? null 
-                            : "Start a new visit for {$record->full_name}"
+                    ->modalDescription(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
+                            ? null
+                            : match ($record->client_type) {
+                                'returning' => "{$record->full_name} is a returning client. Their record is on file.",
+                                'old_new'   => "{$record->full_name} is registered at another KISE branch.",
+                                default     => "Register and sign in {$record->full_name} for today's visit.",
+                            }
                     )
-                    ->modalIcon(fn (Client $record) => 
-                        $record->hasActiveVisit() 
-                            ? 'heroicon-o-information-circle' 
+                    ->modalIcon(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
+                            ? 'heroicon-o-information-circle'
                             : 'heroicon-o-clipboard-document-check'
                     )
-                    ->modalWidth(fn (Client $record) => 
+                    ->modalWidth(
+                        fn(Client $record) =>
                         $record->hasActiveVisit() ? 'md' : 'lg'
                     )
-                    ->form(fn (Client $record) => 
-                        $record->hasActiveVisit() 
+                    ->form(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
                             ? []
                             : [
                                 Forms\Components\Section::make('Visit Details')
@@ -396,13 +443,13 @@ class ClientResource extends Resource
                                         Forms\Components\Select::make('visit_type')
                                             ->label('Visit Type')
                                             ->options([
-                                                'new' => '🆕 New Visit',
+                                                'new'       => '🆕 New Visit',
                                                 'follow_up' => '🔄 Follow-up',
-                                                'review' => '📋 Review',
+                                                'review'    => '📋 Review',
                                                 'emergency' => '🚨 Emergency',
                                             ])
                                             ->required()
-                                            ->default('new')
+                                            ->default($record->client_type === 'returning' ? 'follow_up' : 'new')
                                             ->native(false)
                                             ->columnSpanFull(),
 
@@ -443,65 +490,79 @@ class ClientResource extends Resource
                                                 'full_booking' => 'Fully Booked',
                                                 'other' => 'Other',
                                             ])
-                                            ->visible(fn (Forms\Get $get) => !$get('service_available'))
-                                            ->required(fn (Forms\Get $get) => !$get('service_available'))
+                                            ->visible(fn(Forms\Get $get) => !$get('service_available'))
+                                            ->required(fn(Forms\Get $get) => !$get('service_available'))
                                             ->native(false),
 
                                         Forms\Components\Textarea::make('unavailability_notes')
                                             ->label('Unavailability Notes')
-                                            ->visible(fn (Forms\Get $get) => !$get('service_available'))
+                                            ->visible(fn(Forms\Get $get) => !$get('service_available'))
                                             ->rows(2),
                                     ]),
                             ]
                     )
-                    ->modalContent(fn (Client $record) => 
-                        $record->hasActiveVisit() 
+                    ->modalContent(
+                        fn(Client $record) =>
+                        $record->hasActiveVisit()
                             ? view('filament.components.visit-in-progress', [
                                 'visit' => $record->activeVisit,
                                 'client' => $record,
-                              ])
+                            ])
                             : null
                     )
-                    
+
                     ->action(function (Client $record, array $data) {
                         if ($record->hasActiveVisit()) {
                             $existingVisit = $record->activeVisit;
-                            
+
                             Notification::make()
                                 ->warning()
                                 ->title('Visit Already In Progress')
                                 ->body("Client has an active visit at stage: {$existingVisit->current_stage}")
                                 ->persistent()
                                 ->send();
-                            
+
                             return;
                         }
 
-                        // Create new visit - START AT TRIAGE
+                        // Create visit — boot() sets current_stage='reception' automatically
                         $visit = Visit::create([
-                            'client_id' => $record->id,
-                            'branch_id' => Auth::user()->branch_id,
-                            'visit_type' => $data['visit_type'],
-                            'visit_date'=>date('Y-m-d'),
-                            'visit_purpose' => $data['visit_purpose'],
-                            'purpose_notes' => $data['purpose_notes'] ?? null,
-                            'service_available' => $data['service_available'] ?? true,
+                            'client_id'             => $record->id,
+                            'branch_id'             => Auth::user()->branch_id,
+                            'visit_type'            => $data['visit_type'],
+                            'visit_date'            => date('Y-m-d'),
+                            'visit_purpose'         => $data['visit_purpose'],
+                            'purpose_notes'         => $data['purpose_notes'] ?? null,
+                            'service_available'     => $data['service_available'] ?? true,
                             'unavailability_reason' => $data['unavailability_reason'] ?? null,
-                            'unavailability_notes' => $data['unavailability_notes'] ?? null,
-                            'checked_in_by' => Auth::id(),
-                            'check_in_time' => now(),
-                            'current_stage' => 'triage', // ✅ START DIRECTLY AT TRIAGE
-                            'status' => 'in_progress',
+                            'unavailability_notes'  => $data['unavailability_notes'] ?? null,
+                            'checked_in_by'         => Auth::id(),
+                            'check_in_time'         => now(),
+                            'status'                => 'in_progress',
                         ]);
+
+                        // Complete reception stage and advance to triage queue
+                        $visit->completeStage();
+                        $visit->moveToStage('triage');
 
                         // Show success notification
                         Notification::make()
                             ->success()
                             ->title('Visit Started')
-                            ->body("Visit {$visit->visit_number} created for {$record->full_name} - Client is now in Triage queue")
+                            ->body("Visit {$visit->visit_number} created for {$record->full_name} — now in Triage queue")
                             ->persistent()
                             ->send();
                     }),
+
+                // Profile Hub
+                Tables\Actions\Action::make('profile_hub')
+                    ->label('Profile Hub')
+                    ->icon('heroicon-o-rectangle-stack')
+                    ->color('info')
+                    ->url(fn(Client $record) => route('filament.admin.pages.client-profile-hub', [
+                        'clientId' => $record->id,
+                    ]))
+                    ->openUrlInNewTab(),
 
                 // View Client Details
                 Tables\Actions\ViewAction::make()
@@ -515,7 +576,7 @@ class ClientResource extends Resource
                         ->label('End Visit')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
-                        ->visible(fn (Client $record) => $record->hasActiveVisit())
+                        ->visible(fn(Client $record) => $record->hasActiveVisit())
                         ->form([
                             Forms\Components\Select::make('reason')
                                 ->label('Reason for Ending Visit')
@@ -528,7 +589,7 @@ class ClientResource extends Resource
                                 ])
                                 ->required()
                                 ->native(false),
-                            
+
                             Forms\Components\Textarea::make('notes')
                                 ->label('Notes')
                                 ->required()
@@ -537,7 +598,7 @@ class ClientResource extends Resource
                         ->requiresConfirmation()
                         ->action(function (Client $record, array $data) {
                             $visit = $record->activeVisit;
-                            
+
                             $visit->update([
                                 'status' => 'deferred',
                                 'check_out_time' => now(),
@@ -555,15 +616,122 @@ class ClientResource extends Resource
                         ->label('Visit History')
                         ->icon('heroicon-o-clock')
                         ->color('gray')
-                        ->url(fn (Client $record) => 
+                        ->url(
+                            fn(Client $record) =>
                             route('filament.admin.resources.visits.index', [
                                 'tableFilters[client_id][value]' => $record->id
                             ])
                         ),
                 ])
-                ->icon('heroicon-o-ellipsis-vertical')
-                ->color('gray')
-                ->button(),
+                    ->icon('heroicon-o-ellipsis-vertical')
+                    ->color('gray')
+                    ->button(),
+            ])
+            ->headerActions([
+                // ============================================================
+                // FIND & SIGN IN OLD-NEW CLIENT (cross-branch search)
+                // ============================================================
+                Tables\Actions\Action::make('sign_in_old_new')
+                    ->label('Sign In Old-New Client')
+                    ->icon('heroicon-o-magnifying-glass-circle')
+                    ->color('warning')
+                    ->visible(fn() => auth()->user()->hasRole(['receptionist', 'admin', 'super_admin']))
+                    ->modalHeading('Find & Sign In Old-New Client')
+                    ->modalDescription('Search for a client registered at another KISE branch (outreach/satellite) and sign them in for today\'s visit.')
+                    ->modalIcon('heroicon-o-magnifying-glass-circle')
+                    ->modalWidth('lg')
+                    ->form([
+                        Forms\Components\Select::make('client_id')
+                            ->label('Search Client (all branches)')
+                            ->placeholder('Type name, UCI, national ID, or phone…')
+                            ->searchable()
+                            ->required()
+                            ->getSearchResultsUsing(function (string $search): array {
+                                return Client::withoutGlobalScope('branch')
+                                    ->where(function ($q) use ($search) {
+                                        $q->where('first_name', 'like', "%{$search}%")
+                                          ->orWhere('last_name', 'like', "%{$search}%")
+                                          ->orWhere('uci', 'like', "%{$search}%")
+                                          ->orWhere('national_id', 'like', "%{$search}%")
+                                          ->orWhere('phone_primary', 'like', "%{$search}%");
+                                    })
+                                    ->with('branch')
+                                    ->limit(20)
+                                    ->get()
+                                    ->mapWithKeys(fn($c) => [
+                                        $c->id => "{$c->full_name} — {$c->uci} — {$c->branch?->name}"
+                                    ])
+                                    ->toArray();
+                            })
+                            ->getOptionLabelUsing(fn($value): ?string =>
+                                optional(Client::withoutGlobalScope('branch')->find($value))->full_name
+                            )
+                            ->helperText('Searches clients registered at all KISE facilities')
+                            ->columnSpanFull(),
+
+                        Forms\Components\Select::make('visit_type')
+                            ->label('Visit Type')
+                            ->options([
+                                'new'       => 'New Visit',
+                                'follow_up' => 'Follow-up',
+                                'review'    => 'Review',
+                            ])
+                            ->required()
+                            ->default('new')
+                            ->native(false),
+
+                        Forms\Components\Select::make('visit_purpose')
+                            ->label('Purpose of Visit')
+                            ->options([
+                                'assessment'    => 'Assessment',
+                                'therapy'       => 'Therapy Session',
+                                'device_fitting'=> 'Device Fitting',
+                                'consultation'  => 'Consultation',
+                                'review'        => 'Review/Follow-up',
+                                'other'         => 'Other',
+                            ])
+                            ->required()
+                            ->default('assessment')
+                            ->native(false),
+                    ])
+                    ->action(function (array $data) {
+                        $client = Client::withoutGlobalScope('branch')->findOrFail($data['client_id']);
+
+                        if ($client->hasActiveVisit()) {
+                            Notification::make()
+                                ->warning()
+                                ->title('Visit Already In Progress')
+                                ->body("Client {$client->full_name} already has an active visit (stage: {$client->activeVisit->current_stage})")
+                                ->persistent()
+                                ->send();
+                            return;
+                        }
+
+                        // If from a different branch, mark as old_new
+                        if ($client->branch_id !== Auth::user()->branch_id) {
+                            $client->update(['client_type' => 'old_new']);
+                        }
+
+                        $visit = Visit::create([
+                            'client_id'      => $client->id,
+                            'branch_id'      => Auth::user()->branch_id,
+                            'visit_type'     => $data['visit_type'],
+                            'visit_date'     => today(),
+                            'visit_purpose'  => $data['visit_purpose'],
+                            'checked_in_by'  => Auth::id(),
+                            'check_in_time'  => now(),
+                            'status'         => 'in_progress',
+                        ]);
+
+                        $visit->completeStage();
+                        $visit->moveToStage('triage');
+
+                        Notification::make()
+                            ->success()
+                            ->title('Client Signed In')
+                            ->body("Visit {$visit->visit_number} created for {$client->full_name} — now in Triage queue")
+                            ->send();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([]),
@@ -598,9 +766,14 @@ class ClientResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return static::getModel()::whereHas('visits', function ($query) {
-            $query->where('status', 'in_progress')
-                ->whereDate('check_in_time', today());
-        })->count();
+        $count = Visit::whereDate('visit_date', today())
+            ->where('status', 'in_progress')
+            ->count();
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'success';
     }
 }

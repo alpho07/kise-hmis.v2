@@ -8,19 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\SoftDeletes;
-
 class IntakeAssessment extends Model
 {
-    use HasFactory, SoftDeletes,BelongsToBranch;
+    use HasFactory, BelongsToBranch;
 
     protected $table = 'intake_assessments';
 
     protected $fillable = [
         'visit_id',
         'client_id',
+        'branch_id',
+        'is_editable',
         'verification_mode',
         'data_verified',
+        'verification_notes',
         'reason_for_visit',
         'previous_interventions',
         'current_concerns',
@@ -28,11 +29,11 @@ class IntakeAssessment extends Model
         'developmental_history',
         'educational_background',
         'social_history',
-        'assessment_summary',
+        'services_required',
+        'functional_screening_scores',
+        'intake_summary',
         'recommendations',
         'assessed_by',
-        'service_recommendations',
-        'referral_categories',
         'priority_level',
         'section_status',
         'is_finalized',
@@ -42,15 +43,16 @@ class IntakeAssessment extends Model
     ];
 
     protected $casts = [
-        'data_verified' => 'boolean',
-        'service_recommendations' => 'array',
-        'referral_categories' => 'array',
-        'priority_level' => 'integer',
-        'section_status' => 'array',
-        'is_finalized' => 'boolean',
-        'finalized_at' => 'datetime',
+        'data_verified'               => 'boolean',
+        'is_editable'                 => 'boolean',
+        'service_recommendations'     => 'array',
+        'referral_categories'         => 'array',
+        'priority_level'              => 'integer',
+        'section_status'              => 'array',
+        'is_finalized'                => 'boolean',
+        'finalized_at'                => 'datetime',
         'functional_screening_scores' => 'array',
-        'services_required' => 'array',
+        'services_required'           => 'array',
     ];
 
     public function visit(): BelongsTo

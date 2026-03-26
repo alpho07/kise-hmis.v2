@@ -23,9 +23,14 @@ class CashierQueueResource extends Resource
     protected static ?string $model = Visit::class;
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
     protected static ?string $navigationLabel = 'Cashier Queue';
-    protected static ?string $navigationGroup = 'Finance';
+    protected static ?string $navigationGroup = 'Financial';
     protected static ?int $navigationSort = 2;
     protected static ?string $modelLabel = 'Payment Queue';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin','admin','billing_officer','cashier']);
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -506,12 +511,9 @@ class CashierQueueResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $invoiceCount = Invoice::where('status', 'pending')->count();
-        $serviceRequestCount = ServiceRequest::where('status', 'pending_payment')->count();
-
-        $total = $invoiceCount + $serviceRequestCount;
-
-        return $total > 0 ? (string) $total : null;
+        return Visit::where('current_stage', 'cashier')
+            ->whereHas('invoice')
+            ->count() ?: null;
     }
 
     public static function getNavigationBadgeColor(): ?string

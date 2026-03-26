@@ -1,0 +1,96 @@
+<h2>How should the intake sections be navigated?</h2>
+<p class="subtitle">The form has 12 sections — A through L. Pick the navigation pattern that fits best for intake officers.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="wizard" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#f8fafc;border-radius:8px;">
+      <div style="display:flex;gap:4px;margin-bottom:12px;overflow:hidden;">
+        <div style="flex:1;height:6px;background:#6366f1;border-radius:99px;"></div>
+        <div style="flex:1;height:6px;background:#6366f1;border-radius:99px;"></div>
+        <div style="flex:1;height:6px;background:#6366f1;border-radius:99px;"></div>
+        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;"></div>
+        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;"></div>
+        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:99px;"></div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;color:#374151;min-height:80px;">
+        <div style="font-weight:700;margin-bottom:6px;color:#6366f1">Step 3 of 12 — Disability Profile</div>
+        <div style="height:8px;background:#f1f5f9;border-radius:4px;margin-bottom:4px;"></div>
+        <div style="height:8px;background:#f1f5f9;border-radius:4px;width:70%;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div style="font-size:10px;background:#f1f5f9;padding:4px 10px;border-radius:4px;color:#64748b">← Back</div>
+        <div style="font-size:10px;background:#6366f1;padding:4px 10px;border-radius:4px;color:#fff">Save & Next →</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Linear Wizard (steps)</h3>
+      <p>Progress bar across the top, one section at a time, Back/Next buttons. All on a single URL. Autosaves when clicking Next.</p>
+      <div class="pros-cons" style="font-size:11px;margin-top:8px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Guided, can't miss a section</li><li>Clean focus per step</li></ul></div>
+        <div class="cons"><h4>Cons</h4>  <ul><li>Must go through in order</li><li>No jumping to a specific section</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="sidebar" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#f8fafc;border-radius:8px;">
+      <div style="display:flex;gap:8px;min-height:110px;">
+        <div style="width:90px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px;font-size:9px;flex-shrink:0;">
+          <div style="color:#6366f1;font-weight:700;padding:4px 6px;background:#eef2ff;border-radius:4px;margin-bottom:3px;">✓ Identification</div>
+          <div style="color:#6366f1;font-weight:700;padding:4px 6px;background:#eef2ff;border-radius:4px;margin-bottom:3px;">✓ Disability</div>
+          <div style="color:#1e293b;font-weight:700;padding:4px 6px;background:#e0e7ff;border-radius:4px;border-left:3px solid #6366f1;margin-bottom:3px;">▶ Socio-Demo</div>
+          <div style="color:#94a3b8;padding:4px 6px;margin-bottom:3px;">Medical Hx</div>
+          <div style="color:#94a3b8;padding:4px 6px;margin-bottom:3px;">Screening</div>
+          <div style="color:#94a3b8;padding:4px 6px;">...</div>
+        </div>
+        <div style="flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px;color:#374151;">
+          <div style="font-weight:700;margin-bottom:6px;color:#6366f1">Socio-Demographics</div>
+          <div style="height:8px;background:#f1f5f9;border-radius:4px;margin-bottom:4px;"></div>
+          <div style="height:8px;background:#f1f5f9;border-radius:4px;width:80%;margin-bottom:4px;"></div>
+          <div style="height:8px;background:#f1f5f9;border-radius:4px;width:60%;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Side-nav with sections</h3>
+      <p>Persistent left sidebar listing all sections with completion checkmarks. Click any section to jump directly. Autosaves when switching.</p>
+      <div class="pros-cons" style="font-size:11px;margin-top:8px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Jump to any section</li><li>Always see overall progress</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Less guidance for new users</li><li>Narrower content area</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="tabs" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#f8fafc;border-radius:8px;">
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;min-height:110px;">
+        <div style="display:flex;border-bottom:2px solid #e2e8f0;background:#f8fafc;overflow-x:auto;">
+          <div style="padding:7px 10px;font-size:9px;color:#94a3b8;white-space:nowrap;">✓ ID</div>
+          <div style="padding:7px 10px;font-size:9px;color:#94a3b8;white-space:nowrap;">✓ Disability</div>
+          <div style="padding:7px 10px;font-size:9px;color:#6366f1;font-weight:700;border-bottom:2px solid #6366f1;margin-bottom:-2px;white-space:nowrap;">Socio-Demo</div>
+          <div style="padding:7px 10px;font-size:9px;color:#94a3b8;white-space:nowrap;">Medical</div>
+          <div style="padding:7px 10px;font-size:9px;color:#94a3b8;white-space:nowrap;">Screening</div>
+          <div style="padding:7px 10px;font-size:9px;color:#94a3b8;white-space:nowrap;">...</div>
+        </div>
+        <div style="padding:10px;font-size:11px;color:#374151;">
+          <div style="font-weight:700;margin-bottom:6px;color:#6366f1">Socio-Demographics</div>
+          <div style="height:8px;background:#f1f5f9;border-radius:4px;margin-bottom:4px;"></div>
+          <div style="height:8px;background:#f1f5f9;border-radius:4px;width:70%;"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+        <div style="font-size:10px;background:#6366f1;padding:4px 10px;border-radius:4px;color:#fff">Save Section →</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Top tabs (scrollable)</h3>
+      <p>Horizontal tab bar across the top, scrollable for all 12 sections. Click any tab to switch. Autosaves when switching tabs.</p>
+      <div class="pros-cons" style="font-size:11px;margin-top:8px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Familiar pattern</li><li>Full-width content</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Tabs can get crowded with 12 sections</li><li>Less visual progress cue</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>

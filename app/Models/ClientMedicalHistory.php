@@ -26,6 +26,7 @@ class ClientMedicalHistory extends Model
         'current_medications',
         'surgical_history',
         'immunization_status',
+        'feeding_history',
         'family_medical_history',
         'feeding_history',
     ];

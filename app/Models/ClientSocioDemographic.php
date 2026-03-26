@@ -20,10 +20,12 @@ class ClientSocioDemographic extends Model
         'marital_status',
         'living_arrangement',
         'household_size',
+        'primary_caregiver',
         'source_of_support',
         'other_support_source',
         'primary_language',
         'other_languages',
+        'accessibility_at_home',
         'socio_notes',
     ];
 

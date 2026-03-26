@@ -185,30 +185,26 @@ class CreateTriage extends CreateRecord
             return 'medical_hold';
         }
         
-        // Cleared - determine based on client type
-        // Check if this is first visit (needs intake)
-        $visitCount = Visit::where('client_id', $visit->client_id)
-            ->where('id', '!=', $visit->id)
-            ->whereNotNull('check_out_time') // Only count completed visits
-            ->count();
-        
-        if ($visitCount === 0) {
-            // New client (first visit) → Intake
-            Log::info('Routing to Intake', [
-                'visit_id' => $visit->id,
-                'reason' => 'First visit for client',
-                'visit_count' => $visitCount,
+        // Route by client_type — set at reception sign-in
+        // new / old_new → full intake assessment
+        // returning     → skip intake, go straight to billing
+        $clientType = $visit->client?->client_type ?? 'new';
+
+        if ($clientType === 'returning') {
+            Log::info('Routing to Billing', [
+                'visit_id'    => $visit->id,
+                'reason'      => 'Returning client — skipping intake',
+                'client_type' => $clientType,
             ]);
-            return 'intake';
+            return 'billing';
         }
-        
-        // Returning client → Billing (skip intake, services will be selected at billing)
-        Log::info('Routing to Billing', [
-            'visit_id' => $visit->id,
-            'reason' => 'Returning client',
-            'previous_visits' => $visitCount,
+
+        Log::info('Routing to Intake', [
+            'visit_id'    => $visit->id,
+            'reason'      => 'New or Old-New client — requires intake assessment',
+            'client_type' => $clientType,
         ]);
-        return 'billing';
+        return 'intake';
     }
 
     /**

@@ -26,6 +26,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 
 class IntakeAssessmentEditor extends Page implements HasForms
@@ -39,6 +40,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
     #[Url]
     public int $intakeId = 0;
 
+    #[Url(as: 'section')]
     public string $activeSection = 'A';
     public array $sectionStatus  = [];
     public bool  $isSaving       = false;
@@ -59,7 +61,6 @@ class IntakeAssessmentEditor extends Page implements HasForms
     public function mount(): void
     {
         abort_unless($this->intakeId > 0, 404);
-        abort_unless(static::canAccess(), 403);
 
         $this->intake = IntakeAssessment::with([
             'visit.branch', 'client.county', 'client.subCounty', 'functionalScreening',
@@ -108,6 +109,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'b_ward_id'                 => $client->ward_id,
             'b_primary_address'         => $client->primary_address,
             'b_landmark'                => $client->landmark,
+            'b_email'                   => $client->email,
         ];
 
         $disability = ClientDisability::where('client_id', $client->id)->first();
@@ -116,7 +118,6 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'dis_disability_categories' => $disability->disability_categories ?? [],
             'dis_onset'                 => $disability->onset,
             'dis_level_of_functioning'  => $disability->level_of_functioning,
-            'e2_current_devices'        => $disability->assistive_technology ?? [],
             'dis_disability_notes'      => $disability->disability_notes,
         ] : [];
 
@@ -133,27 +134,47 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'socio_notes'                 => $socio->socio_notes,
         ] : [];
 
+        $feedingHistory = [];
         $med = ClientMedicalHistory::where('client_id', $client->id)->first();
-        $this->sectionData['E'] = $med ? [
-            'med_medical_conditions'     => $med->medical_conditions ?? [],
-            'med_current_medications'    => $med->current_medications,
-            'med_surgical_history'       => $med->surgical_history,
-            'med_family_medical_history' => $med->family_medical_history,
-            'med_immunization_status'    => $med->immunization_status,
-            'med_previous_assessments'   => $med->previous_assessments ?? [],
-            'peri_developmental_concerns'=> $med->developmental_concerns ?? [],
-        ] : [];
+        if ($med?->feeding_history) {
+            $feedingHistory = is_array($med->feeding_history) ? $med->feeding_history : [];
+        }
+        $this->sectionData['E'] = [
+            'med_medical_conditions'        => $med?->medical_conditions ?? [],
+            'med_current_medications'       => $med?->current_medications,
+            'med_surgical_history'          => $med?->surgical_history,
+            'med_family_medical_history'    => $med?->family_medical_history,
+            'med_immunization_status'       => $med?->immunization_status,
+            'med_previous_assessments'      => $med?->previous_assessments ?? [],
+            'peri_developmental_concerns'   => $med?->developmental_concerns ?? [],
+            'developmental_history'         => $med?->developmental_concerns_notes,
+            // E2 — Assistive Technology
+            'e2_has_at'                     => !empty($disability?->assistive_technology) ? 'yes' : null,
+            'e2_current_devices'            => $disability?->assistive_technology ?? [],
+            'e2_previous_devices'           => $med?->assistive_devices_history ?? [],
+            // E5 — Feeding
+            'feeding_method'                => $feedingHistory['feeding_method'] ?? null,
+            'feeding_diet_appetite'         => $feedingHistory['diet_appetite'] ?? null,
+            'feeding_diet_foods_brief'      => $feedingHistory['foods_brief'] ?? null,
+            'feeding_swallowing_concerns'   => $feedingHistory['swallowing_concerns'] ?? [],
+            'feeding_growth_concern'        => $feedingHistory['growth_concern'] ?? null,
+            'social_history'                => $feedingHistory['nutrition_notes'] ?? null,
+        ];
 
         $edu = ClientEducation::where('client_id', $client->id)->first();
         $this->sectionData['F'] = $edu ? [
-            'edu_education_level'    => $edu->education_level,
-            'edu_school_type'        => $edu->school_type,
-            'edu_school_name'        => $edu->school_name,
-            'edu_grade_level'        => $edu->grade_level,
-            'edu_currently_enrolled' => $edu->currently_enrolled ? 'yes' : 'no',
-            'edu_employment_status'  => $edu->employment_status,
-            'edu_occupation_type'    => $edu->occupation_type,
-            'edu_education_notes'    => $edu->education_notes,
+            'edu_education_level'        => $edu->education_level,
+            'edu_school_type'            => $edu->school_type,
+            'edu_school_name'            => $edu->school_name,
+            'edu_grade_level'            => $edu->grade_level,
+            'edu_currently_enrolled'     => $edu->currently_enrolled ? 'yes' : 'no',
+            'edu_attendance_challenges'  => $edu->attendance_challenges ? 'yes' : 'no',
+            'edu_attendance_notes'       => $edu->attendance_notes,
+            'edu_performance_concern'    => $edu->performance_concern ? 'yes' : 'no',
+            'edu_performance_notes'      => $edu->performance_notes,
+            'edu_employment_status'      => $edu->employment_status,
+            'edu_occupation_type'        => $edu->occupation_type,
+            'edu_education_notes'        => $edu->education_notes,
         ] : [];
 
         $scores = $intake->functional_screening_scores ?? [];
@@ -178,11 +199,16 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'priority_level'       => $intake->priority_level,
         ];
 
+        // Auto-detect enrolled schemes from client record on first load
+        $shaAutoDetected  = !empty($client->sha_number);
+        $ncpwdAutoDetected = !empty($client->ncpwd_number);
         $this->sectionData['J'] = [
-            'expected_payment_method' => $sr['payment_method'] ?? null,
-            'sha_enrolled'            => $sr['sha_enrolled'] ?? false,
-            'ncpwd_covered'           => $sr['ncpwd_covered'] ?? false,
-            'has_private_insurance'   => $sr['has_insurance'] ?? false,
+            'expected_payment_method' => $sr['payment_method'] ?? (
+                $shaAutoDetected ? 'sha' : ($ncpwdAutoDetected ? 'ncpwd' : null)
+            ),
+            'sha_enrolled'            => array_key_exists('sha_enrolled', $sr) ? (bool) $sr['sha_enrolled'] : $shaAutoDetected,
+            'ncpwd_covered'           => array_key_exists('ncpwd_covered', $sr) ? (bool) $sr['ncpwd_covered'] : $ncpwdAutoDetected,
+            'has_private_insurance'   => (bool) ($sr['has_insurance'] ?? false),
             'payment_notes'           => $sr['payment_notes'] ?? null,
         ];
 
@@ -270,28 +296,60 @@ class IntakeAssessmentEditor extends Page implements HasForms
 
     public function switchSection(string $section): void
     {
+        if ($this->activeSection !== 'A' && $this->activeSection !== $section) {
+            $this->saveSectionData($this->activeSection);
+        }
         $this->activeSection = $section;
     }
 
     public function prevSection(): void
     {
         $idx = array_search($this->activeSection, $this->sections);
-        if ($idx > 0) $this->activeSection = $this->sections[$idx - 1];
+        if ($idx > 0) {
+            if ($this->activeSection !== 'A') $this->saveSectionData($this->activeSection);
+            $this->activeSection = $this->sections[$idx - 1];
+        }
     }
 
     public function nextSection(): void
     {
         $idx = array_search($this->activeSection, $this->sections);
-        if ($idx < count($this->sections) - 1) $this->activeSection = $this->sections[$idx + 1];
+        if ($idx < count($this->sections) - 1) {
+            if ($this->activeSection !== 'A') $this->saveSectionData($this->activeSection);
+            $this->activeSection = $this->sections[$idx + 1];
+        }
     }
 
     /**
      * Called by Alpine.js capture div in the blade when any input blurs/changes.
      * Alpine wraps each section form with a 1s debounced listener that calls this method.
      */
-    public function saveSectionData(string $section): void
+    /**
+     * Save a section's data.
+     * $explicit = true  → called from the Save button; runs form validation and sends a success notification.
+     * $explicit = false → called on blur/navigation; saves silently without validation noise.
+     */
+    public function saveSectionData(string $section, bool $explicit = false): void
     {
         if (!in_array($section, $this->sections) || $section === 'A') return;
+
+        // Run form validation when the user explicitly pressed Save
+        if ($explicit) {
+            $formMethod = 'section' . $section . 'Form';
+            try {
+                $this->$formMethod->validate();
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                $fields = collect($e->errors())->keys()
+                    ->map(fn($k) => str_replace(['sectionData.' . $section . '.', 'sectionData.'], '', $k))
+                    ->implode(', ');
+                Notification::make()->danger()
+                    ->title('Please fix validation errors')
+                    ->body("Required fields missing: {$fields}")
+                    ->send();
+                // Still persist partial data so work is not lost, but mark status accordingly
+            }
+        }
+
         $this->isSaving = true;
         try {
             $method = 'saveSection' . $section;
@@ -299,10 +357,26 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 $this->$method($this->sectionData[$section] ?? []);
             }
             $this->updateSectionStatus($section);
+
+            if ($explicit) {
+                $label  = $this->sectionLabel[$section] ?? "Section {$section}";
+                $status = $this->sectionStatus[$section] ?? 'incomplete';
+                if ($status === 'complete') {
+                    Notification::make()->success()
+                        ->title("{$label} saved")
+                        ->body('All required fields complete.')
+                        ->send();
+                } else {
+                    Notification::make()->warning()
+                        ->title("{$label} saved (incomplete)")
+                        ->body('Some required fields are still missing — section marked as in progress.')
+                        ->send();
+                }
+            }
         } catch (\Throwable $e) {
             Notification::make()->danger()
-                ->title('Autosave failed')
-                ->body("Section {$section} could not be saved. Please try again.")
+                ->title('Save failed')
+                ->body("Section {$section} could not be saved: " . $e->getMessage())
                 ->send();
         } finally {
             $this->isSaving = false;
@@ -350,20 +424,47 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ];
     }
 
-    public function getProgressProperty(): int
+    #[Computed]
+    public function progress(): int
     {
         return count(array_filter($this->sectionStatus, fn($s) => $s === 'complete'));
     }
 
-    public function getSectionLabelProperty(): array
+    #[Computed]
+    public function sectionLabel(): array
     {
         return [
-            'A' => 'Client Overview',   'B' => 'ID & Contact',
-            'C' => 'Disability',        'D' => 'Socio-Demographics',
-            'E' => 'Medical History',   'F' => 'Education',
-            'G' => 'Funct. Screening',  'H' => 'Presenting Concern',
-            'I' => 'Service Plan',      'J' => 'Payment',
-            'K' => 'Deferral',          'L' => 'Summary',
+            'A' => 'Client Overview',
+            'B' => 'ID & Contact',
+            'C' => 'Disability & NCPWD',
+            'D' => 'Socio-Demographics',
+            'E' => 'Medical History',
+            'F' => 'Education & Work',
+            'G' => 'Functional Screening',
+            'H' => 'Presenting Concern',
+            'I' => 'Service Plan',
+            'J' => 'Payment Pathway',
+            'K' => 'Deferral',
+            'L' => 'Summary & Finalize',
+        ];
+    }
+
+    #[Computed]
+    public function sectionMeta(): array
+    {
+        return [
+            'A' => ['icon' => 'user',              'description' => 'Auto-completed from client record — read only'],
+            'B' => ['icon' => 'identification',    'description' => 'Verify contact details, address, and ID documents'],
+            'C' => ['icon' => 'heart',             'description' => 'Disability category, onset, NCPWD registration'],
+            'D' => ['icon' => 'home',              'description' => 'Household, language, caregiver, support sources'],
+            'E' => ['icon' => 'beaker',            'description' => 'Medical conditions, medications, assistive technology history'],
+            'F' => ['icon' => 'academic-cap',      'description' => 'Education level, school enrollment, employment status'],
+            'G' => ['icon' => 'chart-bar',         'description' => 'Age-banded functional screening across all domains'],
+            'H' => ['icon' => 'chat-bubble-left',  'description' => 'Referral source, reason for visit, current concerns'],
+            'I' => ['icon' => 'clipboard-document','description' => 'Primary service, additional services, priority level'],
+            'J' => ['icon' => 'banknotes',         'description' => 'Payment method, eligibility status, required documents'],
+            'K' => ['icon' => 'calendar',          'description' => 'Defer client if they cannot be served today'],
+            'L' => ['icon' => 'check-circle',      'description' => 'Final review, intake summary, finalize and route visit'],
         ];
     }
 
@@ -375,6 +476,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'birth_certificate_number' => $data['b_birth_certificate']        ?? null,
             'phone_primary'            => $data['b_phone_primary']            ?? null,
             'phone_secondary'          => $data['b_phone_secondary']          ?? null,
+            'email'                    => $data['b_email']                    ?? null,
             'preferred_communication'  => $data['b_preferred_communication']  ?? null,
             'consent_to_sms'           => isset($data['b_consent_to_sms']) ? (bool) $data['b_consent_to_sms'] : null,
             'sha_number'               => $data['b_sha_number']               ?? null,
@@ -397,15 +499,6 @@ class IntakeAssessmentEditor extends Page implements HasForms
     protected function saveSectionC(array $data): void
     {
         if (empty($data['dis_is_disability_known'])) return;
-        $atDevices = array_map(function ($device) {
-            if (($device['device_type'] ?? null) === 'other' && !empty($device['device_type_other'])) {
-                $device['device_type'] = 'other: ' . $device['device_type_other'];
-            }
-            if (($device['source'] ?? null) === 'other' && !empty($device['source_other'])) {
-                $device['source'] = 'other: ' . $device['source_other'];
-            }
-            return $device;
-        }, $data['e2_current_devices'] ?? []);
 
         ClientDisability::updateOrCreate(
             ['client_id' => $this->client->id],
@@ -414,7 +507,6 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'disability_categories' => $data['dis_disability_categories'] ?? [],
                 'onset'                 => $data['dis_onset']                 ?? null,
                 'level_of_functioning'  => $data['dis_level_of_functioning']  ?? null,
-                'assistive_technology'  => $atDevices,
                 'disability_notes'      => $data['dis_disability_notes']      ?? null,
             ]
         );
@@ -436,13 +528,15 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ClientSocioDemographic::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'marital_status'     => $maritalStatus,
-                'living_arrangement' => $data['socio_living_arrangement'] ?? null,
-                'household_size'     => $data['socio_household_size']     ?? null,
-                'source_of_support'  => $data['socio_source_of_support']  ?? [],
-                'primary_language'   => $primaryLanguage,
-                'other_languages'    => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
-                'socio_notes'        => $data['socio_notes']               ?? null,
+                'marital_status'        => $maritalStatus,
+                'living_arrangement'    => $data['socio_living_arrangement']    ?? null,
+                'household_size'        => $data['socio_household_size']        ?? null,
+                'primary_caregiver'     => $data['socio_primary_caregiver']     ?? null,
+                'source_of_support'     => $data['socio_source_of_support']     ?? [],
+                'primary_language'      => $primaryLanguage,
+                'other_languages'       => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
+                'accessibility_at_home' => $data['socio_accessibility_at_home'] ?? null,
+                'socio_notes'           => $data['socio_notes']                 ?? null,
             ]
         );
     }
@@ -478,6 +572,24 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'nutrition_notes'     => $data['feeding_nutrition_notes'] ?? null,
         ], fn($v) => $v !== null && $v !== []);
 
+        // Save E2 current AT devices to disability record
+        if ($data['e2_has_at'] === 'yes' || !empty($data['e2_current_devices'])) {
+            $atDevices = array_map(function ($device) {
+                if (($device['device_type'] ?? null) === 'other' && !empty($device['device_type_other'])) {
+                    $device['device_type'] = 'other: ' . $device['device_type_other'];
+                }
+                if (($device['source'] ?? null) === 'other' && !empty($device['source_other'])) {
+                    $device['source'] = 'other: ' . $device['source_other'];
+                }
+                return $device;
+            }, $data['e2_current_devices'] ?? []);
+
+            ClientDisability::updateOrCreate(
+                ['client_id' => $this->client->id],
+                ['assistive_technology' => $atDevices]
+            );
+        }
+
         ClientMedicalHistory::updateOrCreate(
             ['client_id' => $this->client->id],
             [
@@ -503,14 +615,18 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ClientEducation::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'education_level'    => $data['edu_education_level'] ?? null,
-                'school_type'        => $data['edu_school_type']     ?? null,
-                'school_name'        => $data['edu_school_name']     ?? null,
-                'grade_level'        => $data['edu_grade_level']     ?? null,
-                'currently_enrolled' => ($data['edu_currently_enrolled'] ?? null) === 'yes',
-                'employment_status'  => $employmentStatus,
-                'occupation_type'    => $data['edu_occupation_type'] ?? null,
-                'education_notes'    => $data['edu_education_notes'] ?? null,
+                'education_level'        => $data['edu_education_level']       ?? null,
+                'school_type'            => $data['edu_school_type']           ?? null,
+                'school_name'            => $data['edu_school_name']           ?? null,
+                'grade_level'            => $data['edu_grade_level']           ?? null,
+                'currently_enrolled'     => ($data['edu_currently_enrolled']   ?? null) === 'yes',
+                'attendance_challenges'  => ($data['edu_attendance_challenges'] ?? null) === 'yes',
+                'attendance_notes'       => $data['edu_attendance_notes']      ?? null,
+                'performance_concern'    => ($data['edu_performance_concern']  ?? null) === 'yes',
+                'performance_notes'      => $data['edu_performance_notes']     ?? null,
+                'employment_status'      => $employmentStatus,
+                'occupation_type'        => $data['edu_occupation_type']       ?? null,
+                'education_notes'        => $data['edu_education_notes']       ?? null,
             ]
         );
     }

@@ -4,7 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\IntakeQueueResource\Pages;
 use App\Models\Visit;
-use App\Models\AssessmentFormResponse;
+use App\Models\IntakeAssessment;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -22,6 +22,11 @@ class IntakeQueueResource extends Resource
     protected static ?string $pluralModelLabel = 'Intake Queue';
     protected static ?string $navigationGroup = 'Clinical Workflow';
     protected static ?int $navigationSort = 3;
+
+           public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()->hasRole(['super_admin','admin','intake_officer']);
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -80,19 +85,21 @@ class IntakeQueueResource extends Resource
                 Tables\Columns\TextColumn::make('client_age_sex')
                     ->label('Age / Sex')
                     ->getStateUsing(function ($record) {
-                        $age = $record->client->age ?? 'N/A';
-                        $sex = $record->client->sex ? strtoupper(substr($record->client->sex, 0, 1)) : 'N/A';
-                        return "{$age} / {$sex}";
+                        $age    = $record->client->age ?? 'N/A';
+                        $gender = $record->client->gender ? strtoupper(substr($record->client->gender, 0, 1)) : 'N/A';
+                        return "{$age} yrs / {$gender}";
                     }),
 
-                Tables\Columns\BadgeColumn::make('visit_type')
+                Tables\Columns\TextColumn::make('visit_type')
                     ->label('Visit Type')
-                    ->colors([
-                        'danger' => 'emergency',
-                        'warning' => 'urgent',
-                        'success' => 'new',
-                        'primary' => 'follow_up',
-                    ])
+                    ->badge()
+                    ->color(fn($state) => match($state) {
+                        'emergency' => 'danger',
+                        'urgent'    => 'warning',
+                        'new'       => 'success',
+                        'follow_up' => 'primary',
+                        default     => 'gray',
+                    })
                     ->formatStateUsing(fn($state) => ucfirst(str_replace('_', ' ', $state ?? 'new'))),
 
                 Tables\Columns\TextColumn::make('waiting_time')
@@ -112,29 +119,21 @@ class IntakeQueueResource extends Resource
                     ->icon('heroicon-o-clock')
                     ->sortable(),
 
-                Tables\Columns\BadgeColumn::make('intake_status')
+                Tables\Columns\TextColumn::make('intake_status')
                     ->label('Status')
-                    ->getStateUsing(function ($record) {
-                        $intake = AssessmentFormResponse::where('visit_id', $record->id)
-                            ->whereHas('schema', function ($q) {
-                                $q->where('slug', 'intake-assessment');
-                            })
-                            ->first();
-                        
-                        if (!$intake) return 'pending';
-                        return $intake->status ?? 'in_progress';
+                    ->badge()
+                    ->getStateUsing(fn($record) => IntakeAssessment::where('visit_id', $record->id)->exists()
+                        ? 'in_progress' : 'pending'
+                    )
+                    ->color(fn($state) => match($state) {
+                        'in_progress' => 'warning',
+                        'pending'     => 'gray',
+                        default       => 'gray',
                     })
-                    ->colors([
-                        'success' => 'completed',
-                        'warning' => 'in_progress',
-                        'gray' => 'pending',
-                    ])
                     ->formatStateUsing(fn($state) => ucfirst(str_replace('_', ' ', $state)))
                     ->icon(fn($state) => match($state) {
-                        'completed' => 'heroicon-o-check-circle',
                         'in_progress' => 'heroicon-o-arrow-path',
-                        'pending' => 'heroicon-o-clock',
-                        default => 'heroicon-o-question-mark-circle',
+                        default       => 'heroicon-o-clock',
                     }),
             ])
             ->filters([
@@ -152,22 +151,25 @@ class IntakeQueueResource extends Resource
                     ->icon('heroicon-o-play')
                     ->color('success')
                     ->button()
-                    ->visible(function ($record) {
-                        return !AssessmentFormResponse::where('visit_id', $record->id)
-                            ->whereHas('schema', function ($q) {
-                                $q->where('slug', 'intake-assessment');
-                            })
-                            ->exists();
-                    })
-                    ->url(function ($record) {
-                        return "/admin/dynamic-assessments/create?form_slug=intake-assessment&visit_id={$record->id}";
-                    })
-                    ->openUrlInNewTab(),
+                    ->visible(fn($record) => !IntakeAssessment::where('visit_id', $record->id)->exists())
+                    ->action(function ($record) {
+                        $intake = IntakeAssessment::firstOrCreate(
+                            ['visit_id' => $record->id],
+                            [
+                                'client_id'      => $record->client_id,
+                                'branch_id'      => $record->branch_id ?? auth()->user()?->branch_id,
+                                'assessed_by'    => auth()->id(),
+                                'section_status' => [],
+                            ]
+                        );
+                        return redirect(route('filament.admin.pages.intake-assessment-editor', ['intakeId' => $intake->id]));
+                    }),
 
-                Tables\Actions\Action::make('view_edit')
-                    ->label('View/Edit')
-                    ->icon('heroicon-o-eye')
+                Tables\Actions\Action::make('continue_intake')
+                    ->label('Continue')
+                    ->icon('heroicon-o-pencil-square')
                     ->color('primary')
+                    ->button()
                     ->visible(function ($record) {
                         return \App\Models\IntakeAssessment::where('visit_id', $record->id)->exists();
                     })
