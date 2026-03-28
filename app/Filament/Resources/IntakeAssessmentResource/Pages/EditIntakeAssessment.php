@@ -4,6 +4,7 @@ namespace App\Filament\Resources\IntakeAssessmentResource\Pages;
 
 use App\Filament\Resources\IntakeAssessmentResource;
 use App\Models\ClientMedicalHistory;
+use App\Models\ClientSocioDemographic;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
@@ -47,6 +48,31 @@ class EditIntakeAssessment extends EditRecord
         $data['imm_recent_illness_post_vaccine'] = $imm['recent_illness_post_vaccine'] ?? null;
         $data['imm_recent_illness_notes']    = $imm['recent_illness_notes']     ?? null;
         $data['med_immunization_status']     = $med?->immunization_status       ?? null;
+
+        // ── Section D socio-demographics ─────────────────────────────────────
+        $socio = ClientSocioDemographic::where('client_id', $this->record->client_id)->first();
+        if ($socio) {
+            $caregiverRaw   = $socio->primary_caregiver ?? null;
+            $caregiverOther = str_starts_with($caregiverRaw ?? '', 'other: ');
+            $langRaw        = $socio->primary_language ?? null;
+            $langOther      = str_starts_with($langRaw ?? '', 'other: ');
+
+            $data['socio_marital_status']        = $socio->marital_status;
+            $data['socio_marital_other']         = $socio->marital_status_other;
+            $data['socio_living_arrangement']    = $socio->living_arrangement;
+            $data['socio_living_other']          = $socio->living_arrangement_other;
+            $data['socio_household_size']        = $socio->household_size;
+            $data['socio_primary_caregiver']     = $caregiverOther ? 'other' : $caregiverRaw;
+            $data['socio_caregiver_other']       = $caregiverOther ? substr($caregiverRaw, 7) : null;
+            $data['socio_source_of_support']     = $socio->source_of_support ?? [];
+            $data['socio_other_support']         = $socio->other_support_source;
+            $data['socio_school_enrolled']       = $socio->school_enrolled;
+            $data['socio_primary_language']      = $langOther ? 'other' : $langRaw;
+            $data['socio_language_other']        = $langOther ? substr($langRaw, 7) : null;
+            $data['socio_other_languages']       = $socio->other_languages[0] ?? null;
+            $data['socio_accessibility_at_home'] = $socio->accessibility_at_home;
+            $data['socio_notes']                 = $socio->socio_notes;
+        }
 
         return $data;
     }
@@ -125,6 +151,33 @@ class EditIntakeAssessment extends EditRecord
                 'immunization_records' => $immunizationRecords ?: null,
                 'immunization_status'  => $data['med_immunization_status'] ?? null,
                 'developmental_concerns_notes' => $data['developmental_history'] ?? null,
+            ]
+        );
+
+        // ── Section D socio-demographics ─────────────────────────────────────
+        $primaryCaregiver = ($data['socio_primary_caregiver'] ?? null) === 'other'
+            ? 'other: ' . ($data['socio_caregiver_other'] ?? 'unspecified')
+            : ($data['socio_primary_caregiver'] ?? null);
+        $primaryLanguage = ($data['socio_primary_language'] ?? null) === 'other'
+            ? 'other: ' . ($data['socio_language_other'] ?? 'unspecified')
+            : ($data['socio_primary_language'] ?? null);
+
+        ClientSocioDemographic::updateOrCreate(
+            ['client_id' => $clientId],
+            [
+                'marital_status'           => $data['socio_marital_status']        ?? null,
+                'marital_status_other'     => $data['socio_marital_other']         ?? null,
+                'living_arrangement'       => $data['socio_living_arrangement']    ?? null,
+                'living_arrangement_other' => $data['socio_living_other']          ?? null,
+                'household_size'           => $data['socio_household_size']        ?? null,
+                'primary_caregiver'        => $primaryCaregiver,
+                'source_of_support'        => $data['socio_source_of_support']     ?? [],
+                'other_support_source'     => $data['socio_other_support']         ?? null,
+                'school_enrolled'          => $data['socio_school_enrolled']       ?? null,
+                'primary_language'         => $primaryLanguage,
+                'other_languages'          => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
+                'accessibility_at_home'    => $data['socio_accessibility_at_home'] ?? null,
+                'socio_notes'              => $data['socio_notes']                 ?? null,
             ]
         );
     }

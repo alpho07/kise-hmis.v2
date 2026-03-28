@@ -298,7 +298,7 @@
                                             wire:target="finalize"
                                             @class([
                                                 'inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2',
-                                                'bg-green-600 hover:bg-green-700 text-white shadow-sm focus:ring-green-500' => $allComplete,
+                                                'fi-btn fi-btn-color-primary fi-color-primary bg-primary-600 hover:bg-primary-500 text-white shadow-sm focus:ring-primary-500' => $allComplete,
                                                 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed' => !$allComplete,
                                             ])
                                             @disabled(!$allComplete)

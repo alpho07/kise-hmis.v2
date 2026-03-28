@@ -39,6 +39,7 @@ class IntakeAssessment extends Model
         'section_status',
         'is_finalized',
         'finalized_at',
+        'uploaded_reports',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class IntakeAssessment extends Model
         'finalized_at'                => 'datetime',
         'functional_screening_scores' => 'array',
         'services_required'           => 'array',
+        'uploaded_reports'            => 'array',
     ];
 
     public function visit(): BelongsTo

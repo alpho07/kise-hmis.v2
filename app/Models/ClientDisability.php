@@ -24,12 +24,16 @@ class ClientDisability extends Model
         'assistive_technology',
         'assistive_technology_notes',
         'disability_notes',
+        'evidence_files',
+        'ncpwd_registered',
+        'ncpwd_verification_status',
     ];
 
     protected $casts = [
         'is_disability_known' => 'boolean',
         'disability_categories' => 'array',
         'assistive_technology' => 'array',
+        'evidence_files' => 'array',
     ];
 
     public function client(): BelongsTo

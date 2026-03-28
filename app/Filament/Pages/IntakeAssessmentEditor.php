@@ -113,22 +113,48 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ];
 
         $disability = ClientDisability::where('client_id', $client->id)->first();
+        // Auto-infer ncpwd_registered from the client record when it hasn't been explicitly set:
+        // if a number exists on the client, the client is registered — mark 'yes' as the default.
+        $ncpwdRegistered = $disability?->ncpwd_registered;
+        if (empty($ncpwdRegistered) && !empty($client->ncpwd_number)) {
+            $ncpwdRegistered = 'yes';
+        }
         $this->sectionData['C'] = $disability ? [
-            'dis_is_disability_known'   => $disability->is_disability_known,
-            'dis_disability_categories' => $disability->disability_categories ?? [],
-            'dis_onset'                 => $disability->onset,
-            'dis_level_of_functioning'  => $disability->level_of_functioning,
-            'dis_disability_notes'      => $disability->disability_notes,
-        ] : [];
+            'dis_is_disability_known'        => $disability->is_disability_known,
+            'dis_disability_categories'      => $disability->disability_categories ?? [],
+            'dis_onset'                      => $disability->onset,
+            'dis_level_of_functioning'       => $disability->level_of_functioning,
+            'dis_disability_notes'           => $disability->disability_notes,
+            'dis_evidence_files'             => $this->wrapFileState($disability->evidence_files ?? []),
+            'dis_ncpwd_registered'           => $ncpwdRegistered,
+            'dis_ncpwd_number'               => $client->ncpwd_number,
+            'dis_ncpwd_verification_status'  => $disability->ncpwd_verification_status,
+        ] : [
+            // No disability record yet — still pre-fill NCPWD fields from client if the number exists
+            'dis_ncpwd_registered' => !empty($client->ncpwd_number) ? 'yes' : null,
+            'dis_ncpwd_number'     => $client->ncpwd_number,
+        ];
 
         $socio = ClientSocioDemographic::where('client_id', $client->id)->first();
+        // primary_caregiver is stored as plain value or 'other: <text>' for the free-text case
+        $caregiverRaw = $socio?->primary_caregiver ?? null;
+        $caregiverIsOther = str_starts_with($caregiverRaw ?? '', 'other: ');
+        // primary_language is similarly stored as plain value or 'other: <text>'
+        $langRaw = $socio?->primary_language ?? null;
+        $langIsOther = str_starts_with($langRaw ?? '', 'other: ');
         $this->sectionData['D'] = $socio ? [
             'socio_marital_status'        => $socio->marital_status,
+            'socio_marital_other'         => $socio->marital_status_other,
             'socio_living_arrangement'    => $socio->living_arrangement,
+            'socio_living_other'          => $socio->living_arrangement_other,
             'socio_household_size'        => $socio->household_size,
-            'socio_primary_caregiver'     => $socio->primary_caregiver,
+            'socio_primary_caregiver'     => $caregiverIsOther ? 'other' : $caregiverRaw,
+            'socio_caregiver_other'       => $caregiverIsOther ? substr($caregiverRaw, 7) : null,
             'socio_source_of_support'     => $socio->source_of_support ?? [],
-            'socio_primary_language'      => $socio->primary_language,
+            'socio_other_support'         => $socio->other_support_source,
+            'socio_school_enrolled'       => $socio->school_enrolled,
+            'socio_primary_language'      => $langIsOther ? 'other' : $langRaw,
+            'socio_language_other'        => $langIsOther ? substr($langRaw, 7) : null,
             'socio_other_languages'       => $socio->other_languages[0] ?? null,
             'socio_accessibility_at_home' => $socio->accessibility_at_home,
             'socio_notes'                 => $socio->socio_notes,
@@ -139,14 +165,30 @@ class IntakeAssessmentEditor extends Page implements HasForms
         if ($med?->feeding_history) {
             $feedingHistory = is_array($med->feeding_history) ? $med->feeding_history : [];
         }
-        $peri = $med?->perinatal_history ?? [];
+        $peri    = $med?->perinatal_history          ?? [];
+        $imm     = $med?->immunization_records        ?? [];
+        $atNeeds = $med?->assistive_technology_needs  ?? [];
         $this->sectionData['E'] = [
+            // E1 — Medical History
             'med_medical_conditions'        => $med?->medical_conditions ?? [],
             'med_current_medications'       => $med?->current_medications,
             'med_surgical_history'          => $med?->surgical_history,
             'med_family_medical_history'    => $med?->family_medical_history,
+            'family_history'                => $intake->family_history,
             'med_immunization_status'       => $med?->immunization_status,
             'med_previous_assessments'      => $med?->previous_assessments ?? [],
+            'med_has_at_history'            => (!empty($disability?->assistive_technology) || !empty($med?->assistive_devices_history)) ? 'yes' : null,
+            'allergy_items'                 => $med?->allergies ?? [],
+            // E2 — Assistive Technology
+            'e2_has_at'                     => !empty($disability?->assistive_technology) ? 'yes' : null,
+            'e2_current_devices'            => $disability?->assistive_technology ?? [],
+            'e2_previous_at'                => !empty($med?->assistive_devices_history) ? 'yes' : null,
+            'e2_previous_devices'           => $med?->assistive_devices_history ?? [],
+            'e2_needs_at'                   => $atNeeds['needs_at']         ?? null,
+            'e2_needs_categories'           => $atNeeds['needs_categories'] ?? [],
+            'e2_needs_priority'             => $atNeeds['needs_priority']   ?? null,
+            'e2_needs_notes'                => $atNeeds['needs_notes']      ?? null,
+            'e2_satisfaction'               => $atNeeds['satisfaction']     ?? null,
             // E3 — Perinatal History
             'peri_pregnancy_complications'  => $peri['pregnancy_complications'] ?? [],
             'peri_place_of_birth'           => $peri['place_of_birth']          ?? null,
@@ -157,17 +199,21 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'peri_early_medical_issues'     => $peri['early_medical_issues']    ?? [],
             'peri_developmental_concerns'   => $peri['developmental_concerns']  ?? [],
             'developmental_history'         => $med?->developmental_concerns_notes,
-            // E2 — Assistive Technology
-            'e2_has_at'                     => !empty($disability?->assistive_technology) ? 'yes' : null,
-            'e2_current_devices'            => $disability?->assistive_technology ?? [],
-            'e2_previous_devices'           => $med?->assistive_devices_history ?? [],
+            // E4 — Immunization
+            'imm_epi_status'                  => $imm['epi_status']                  ?? [],
+            'imm_epi_card_seen'               => $imm['epi_card_seen']               ?? null,
+            'imm_epi_card_photo'              => $this->wrapFileState($imm['epi_card_photo'] ?? null),
+            'imm_missed_doses'                => $imm['missed_doses']                ?? null,
+            'imm_missed_doses_which'          => $imm['missed_doses_which']          ?? null,
+            'imm_recent_illness_post_vaccine' => $imm['recent_illness_post_vaccine'] ?? null,
+            'imm_recent_illness_notes'        => $imm['recent_illness_notes']        ?? null,
             // E5 — Feeding
-            'feeding_method'                => $feedingHistory['feeding_method'] ?? null,
-            'feeding_diet_appetite'         => $feedingHistory['diet_appetite'] ?? null,
-            'feeding_diet_foods_brief'      => $feedingHistory['foods_brief'] ?? null,
+            'feeding_method'                => $feedingHistory['feeding_method']    ?? null,
+            'feeding_diet_appetite'         => $feedingHistory['diet_appetite']     ?? null,
+            'feeding_diet_foods_brief'      => $feedingHistory['foods_brief']       ?? null,
             'feeding_swallowing_concerns'   => $feedingHistory['swallowing_concerns'] ?? [],
-            'feeding_growth_concern'        => $feedingHistory['growth_concern'] ?? null,
-            'social_history'                => $feedingHistory['nutrition_notes'] ?? null,
+            'feeding_growth_concern'        => $feedingHistory['growth_concern']    ?? null,
+            'social_history'                => $feedingHistory['nutrition_notes']   ?? null,
         ];
 
         $edu = ClientEducation::where('client_id', $client->id)->first();
@@ -198,6 +244,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'reason_for_visit'       => $intake->reason_for_visit,
             'current_concerns'       => $intake->current_concerns,
             'previous_interventions' => $intake->previous_interventions,
+            'h_reports_uploaded'     => $this->wrapFileState($intake->uploaded_reports ?? []),
         ];
 
         $this->sectionData['I'] = [
@@ -237,6 +284,59 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'priority_level'     => $intake->priority_level,
             'data_verified'      => $intake->data_verified,
         ];
+    }
+
+    /**
+     * Wrap raw DB file value(s) into the UUID-keyed format Filament FileUpload expects
+     * internally (mirrors what afterStateHydrated produces). This must be done manually
+     * because Form::fill() is never called in this custom editor page, so the
+     * afterStateHydrated hook never fires on its own.
+     *
+     * Input:  null | 'path.jpg' | ['path1.jpg', 'path2.jpg'] | [uuid => 'path.jpg']
+     * Output: [uuid => 'path.jpg', ...]
+     */
+    protected function wrapFileState(mixed $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+
+        $paths = is_string($value)
+            ? [$value]
+            : array_values(array_filter((array) $value, 'is_string'));
+
+        $result = [];
+        foreach ($paths as $path) {
+            if ($path !== '') {
+                $result[(string) \Illuminate\Support\Str::uuid()] = $path;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Extract a plain file path from FileUpload state after saveUploadedFiles() runs.
+     * saveUploadedFiles() produces a UUID-keyed array [{uuid} => 'path.jpg']; this
+     * strips the key and returns the bare string (or null) for single-file fields.
+     */
+    protected function extractSingleFileState(mixed $state): ?string
+    {
+        if (blank($state)) {
+            return null;
+        }
+
+        if (is_string($state)) {
+            return $state ?: null;
+        }
+
+        if (is_array($state)) {
+            $values = array_values($state);
+            $first = $values[0] ?? null;
+            return is_string($first) ? ($first ?: null) : null;
+        }
+
+        return null;
     }
 
     protected function flattenScreeningAnswers(array $scores): array
@@ -363,6 +463,17 @@ class IntakeAssessmentEditor extends Page implements HasForms
         try {
             $method = 'saveSection' . $section;
             if (method_exists($this, $method)) {
+                // Trigger saveUploadedFiles() on any FileUpload components so that
+                // temporary uploads are moved to permanent storage and the sectionData
+                // property is updated to plain string paths before we read it.
+                // We avoid calling getState() on the full form because that dehydrates
+                // visible-only fields and can strip data from conditionally-hidden sections.
+                $formMethod = 'section' . $section . 'Form';
+                foreach ($this->$formMethod->getFlatComponents(withHidden: true) as $component) {
+                    if ($component instanceof \Filament\Forms\Components\FileUpload) {
+                        $component->saveUploadedFiles();
+                    }
+                }
                 $this->$method($this->sectionData[$section] ?? []);
             }
             $this->updateSectionStatus($section);
@@ -407,6 +518,17 @@ class IntakeAssessmentEditor extends Page implements HasForms
     {
         $data     = $this->sectionData[$section] ?? [];
         $required = $this->requiredFields()[$section] ?? [];
+
+        // Section D: marital_status is only shown for clients >= 18.
+        // Drop it from the required list for under-18 clients so they can complete the section.
+        if ($section === 'D' && in_array('socio_marital_status', $required)) {
+            $dob = $this->client?->date_of_birth;
+            $ageYears = $dob ? (int) Carbon::parse($dob)->diffInYears(now()) : 999;
+            if ($ageYears < 18) {
+                $required = array_values(array_diff($required, ['socio_marital_status']));
+            }
+        }
+
         if (empty($required)) return 'complete';
         foreach ($required as $field) {
             $val = $data[$field] ?? null;
@@ -503,6 +625,24 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'verification_mode'  => $data['verification_mode']  ?? null,
             'verification_notes' => $data['verification_notes'] ?? null,
         ]);
+
+        // Cross-section sync: keep Section C's NCPWD fields in step with Section B's number field.
+        // If a number is present → mark registered = 'yes' and mirror the number.
+        // If the number is cleared → reset the registered flag so the user must re-confirm in C.
+        $ncpwdNumber = $data['b_ncpwd_number'] ?? null;
+        if (!empty($ncpwdNumber)) {
+            $this->sectionData['C']['dis_ncpwd_number']   = $ncpwdNumber;
+            // Only upgrade to 'yes'; don't overwrite an explicit 'no' / 'unknown' the user set in C.
+            if (empty($this->sectionData['C']['dis_ncpwd_registered'] ?? null)) {
+                $this->sectionData['C']['dis_ncpwd_registered'] = 'yes';
+            }
+        } else {
+            // Number removed in B — clear the mirror in C so C doesn't show stale data.
+            $this->sectionData['C']['dis_ncpwd_number'] = null;
+            if (($this->sectionData['C']['dis_ncpwd_registered'] ?? null) === 'yes') {
+                $this->sectionData['C']['dis_ncpwd_registered'] = null;
+            }
+        }
     }
 
     protected function saveSectionC(array $data): void
@@ -512,24 +652,36 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ClientDisability::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'is_disability_known'   => true,
-                'disability_categories' => $data['dis_disability_categories'] ?? [],
-                'onset'                 => $data['dis_onset']                 ?? null,
-                'level_of_functioning'  => $data['dis_level_of_functioning']  ?? null,
-                'disability_notes'      => $data['dis_disability_notes']      ?? null,
+                'is_disability_known'        => true,
+                'disability_categories'      => $data['dis_disability_categories']     ?? [],
+                'onset'                      => $data['dis_onset']                      ?? null,
+                'level_of_functioning'       => $data['dis_level_of_functioning']       ?? null,
+                'disability_notes'           => $data['dis_disability_notes']           ?? null,
+                'evidence_files'             => array_values($data['dis_evidence_files'] ?? []),
+                'ncpwd_registered'           => $data['dis_ncpwd_registered']           ?? null,
+                'ncpwd_verification_status'  => $data['dis_ncpwd_verification_status']  ?? null,
             ]
         );
-        if (($data['dis_ncpwd_registered'] ?? null) === 'yes' && !empty($data['dis_ncpwd_number'])) {
+        // Always sync ncpwd_number to the client record when a number is provided
+        if (!empty($data['dis_ncpwd_number'])) {
             $this->client->update(['ncpwd_number' => $data['dis_ncpwd_number']]);
         }
     }
 
     protected function saveSectionD(array $data): void
     {
-        // marital_status is an ENUM — store only the enum value, not 'other: ...'
+        // marital_status is an ENUM — store only the enum value; free text in separate column
         $maritalStatus = $data['socio_marital_status'] ?? null;
 
-        // primary_language is a VARCHAR — safe to store free-text detail
+        // living_arrangement is an ENUM — same pattern
+        $livingArrangement = $data['socio_living_arrangement'] ?? null;
+
+        // primary_caregiver is a VARCHAR — store 'other: <text>' for free-text case
+        $primaryCaregiver = ($data['socio_primary_caregiver'] ?? null) === 'other'
+            ? 'other: ' . ($data['socio_caregiver_other'] ?? 'unspecified')
+            : ($data['socio_primary_caregiver'] ?? null);
+
+        // primary_language is a VARCHAR — store 'other: <text>' for free-text case
         $primaryLanguage = ($data['socio_primary_language'] ?? null) === 'other'
             ? 'other: ' . ($data['socio_language_other'] ?? 'unspecified')
             : ($data['socio_primary_language'] ?? null);
@@ -537,15 +689,19 @@ class IntakeAssessmentEditor extends Page implements HasForms
         ClientSocioDemographic::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'marital_status'        => $maritalStatus,
-                'living_arrangement'    => $data['socio_living_arrangement']    ?? null,
-                'household_size'        => $data['socio_household_size']        ?? null,
-                'primary_caregiver'     => $data['socio_primary_caregiver']     ?? null,
-                'source_of_support'     => $data['socio_source_of_support']     ?? [],
-                'primary_language'      => $primaryLanguage,
-                'other_languages'       => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
-                'accessibility_at_home' => $data['socio_accessibility_at_home'] ?? null,
-                'socio_notes'           => $data['socio_notes']                 ?? null,
+                'marital_status'           => $maritalStatus,
+                'marital_status_other'     => $data['socio_marital_other']          ?? null,
+                'living_arrangement'       => $livingArrangement,
+                'living_arrangement_other' => $data['socio_living_other']           ?? null,
+                'household_size'           => $data['socio_household_size']         ?? null,
+                'primary_caregiver'        => $primaryCaregiver,
+                'source_of_support'        => $data['socio_source_of_support']      ?? [],
+                'other_support_source'     => $data['socio_other_support']          ?? null,
+                'school_enrolled'          => $data['socio_school_enrolled']        ?? null,
+                'primary_language'         => $primaryLanguage,
+                'other_languages'          => !empty($data['socio_other_languages']) ? [$data['socio_other_languages']] : [],
+                'accessibility_at_home'    => $data['socio_accessibility_at_home']  ?? null,
+                'socio_notes'              => $data['socio_notes']                  ?? null,
             ]
         );
     }
@@ -574,11 +730,12 @@ class IntakeAssessmentEditor extends Page implements HasForms
             $feedingConcernsRaw[] = 'other: ' . $data['feeding_swallowing_concerns_other'];
         }
         $feedingHistory = array_filter([
-            'feeding_method'      => $data['feeding_method']          ?? null,
-            'diet_appetite'       => $data['feeding_diet_appetite']   ?? null,
+            'feeding_method'      => $data['feeding_method']             ?? null,
+            'diet_appetite'       => $data['feeding_diet_appetite']      ?? null,
+            'foods_brief'         => $data['feeding_diet_foods_brief']   ?? null,
             'swallowing_concerns' => $feedingConcernsRaw ?: null,
-            'growth_concern'      => $data['feeding_growth_concern']  ?? null,
-            'nutrition_notes'     => $data['feeding_nutrition_notes'] ?? null,
+            'growth_concern'      => $data['feeding_growth_concern']     ?? null,
+            'nutrition_notes'     => $data['social_history']             ?? null,
         ], fn($v) => $v !== null && $v !== []);
 
         // Save E2 current AT devices to disability record
@@ -635,6 +792,24 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'developmental_concerns'  => $devConcerns ?: null,
         ], fn($v) => $v !== null && $v !== []);
 
+        $immunizationRecords = array_filter([
+            'epi_status'                  => $data['imm_epi_status']                  ?? [],
+            'epi_card_seen'               => $data['imm_epi_card_seen']               ?? null,
+            'epi_card_photo'              => $this->extractSingleFileState($data['imm_epi_card_photo'] ?? null),
+            'missed_doses'                => $data['imm_missed_doses']                ?? null,
+            'missed_doses_which'          => $data['imm_missed_doses_which']          ?? null,
+            'recent_illness_post_vaccine' => $data['imm_recent_illness_post_vaccine'] ?? null,
+            'recent_illness_notes'        => $data['imm_recent_illness_notes']        ?? null,
+        ], fn($v) => $v !== null && $v !== []);
+
+        $atNeeds = array_filter([
+            'needs_at'         => $data['e2_needs_at']         ?? null,
+            'needs_categories' => $data['e2_needs_categories'] ?? [],
+            'needs_priority'   => $data['e2_needs_priority']   ?? null,
+            'needs_notes'      => $data['e2_needs_notes']      ?? null,
+            'satisfaction'     => $data['e2_satisfaction']     ?? null,
+        ], fn($v) => $v !== null && $v !== []);
+
         ClientMedicalHistory::updateOrCreate(
             ['client_id' => $this->client->id],
             [
@@ -643,14 +818,20 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'surgical_history'             => $data['med_surgical_history']       ?? null,
                 'family_medical_history'       => $data['med_family_medical_history'] ?? null,
                 'immunization_status'          => $data['med_immunization_status']    ?? null,
+                'immunization_records'         => $immunizationRecords ?: null,
                 'feeding_history'              => $feedingHistory ?: null,
                 'previous_assessments'         => $prevAssessments,
                 'developmental_concerns'       => $devConcerns,
                 'developmental_concerns_notes' => $data['developmental_history']      ?? null,
                 'assistive_devices_history'    => $data['e2_previous_devices']        ?? [],
                 'perinatal_history'            => $perinatHistory ?: null,
+                'allergies'                    => $data['allergy_items']              ?? [],
+                'assistive_technology_needs'   => $atNeeds ?: null,
             ]
         );
+
+        // family_history lives on the intake_assessments record itself
+        $this->intake->update(['family_history' => $data['family_history'] ?? null]);
     }
 
     protected function saveSectionF(array $data): void
@@ -729,6 +910,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'current_concerns'       => $data['current_concerns']       ?? null,
             'previous_interventions' => $data['previous_interventions'] ?? null,
             'services_required'      => $sr,
+            'uploaded_reports'       => array_values($data['h_reports_uploaded'] ?? []),
         ]);
     }
 
@@ -969,7 +1151,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                     'service_booking_id'      => $booking->id,
                     'service_id'              => $booking->service_id,
                     'department_id'           => $booking->department_id,
-                    'item_description'        => $booking->service?->name ?? 'Service',
+                    'description'             => $booking->service?->name ?? 'Service',
                     'quantity'                => 1,
                     'unit_price'              => $base,
                     'subtotal'                => $base,
