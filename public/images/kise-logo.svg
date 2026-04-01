@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none">
+  <!-- Logo mark: white rounded square, black K -->
+  <rect width="36" height="36" x="2" y="2" rx="8" fill="#ffffff"/>
+  <text x="20" y="26" font-family="Inter,Arial,sans-serif" font-size="20" font-weight="900" text-anchor="middle" fill="#000000">K</text>
+  <!-- Brand text: always white (works on green + dark sidebars) -->
+  <text x="48" y="16" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="800" fill="#ffffff" letter-spacing="-0.3">KISE</text>
+  <text x="48" y="30" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="500" fill="rgba(255,255,255,0.65)" letter-spacing="1.5">HMIS</text>
+</svg>

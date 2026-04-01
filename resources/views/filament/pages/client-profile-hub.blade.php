@@ -1,6 +1,168 @@
 {{-- resources/views/filament/pages/client-profile-hub.blade.php --}}
 <x-filament-panels::page>
 
+<style>
+/* ═══ Client Profile Hub — KISE Brand Theme ══════════════════════════ */
+.kph-header-card {
+    overflow: hidden;
+    border-radius: 1.5rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 18px 50px -34px rgba(15,23,42,.28);
+}
+.kph-dark-band { background: #282F3B; padding: 24px 28px 22px; }
+.kph-action-bar {
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    padding: 14px 28px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.kph-client-name { color: #ffffff; font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
+.kph-uci { font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace; background: rgba(255,255,255,.1); color: #FFC105; border: 1px solid rgba(255,193,5,.25); padding: 3px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; letter-spacing: .06em; }
+.kph-band-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 5px; font-size: 0.62rem; font-weight: 700; }
+.kph-stat-box { min-width: 62px; border-radius: 10px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); padding: 10px 12px; text-align: center; }
+.kph-stat-num { font-size: 1.2rem; font-weight: 800; line-height: 1; }
+.kph-stat-lbl { font-size: 0.52rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; color: rgba(255,255,255,.38); margin-top: 3px; }
+
+/* Tab transition */
+.kph-tab-panel { animation: kph-tab-in 0.22s ease-out both; padding-top: 4px; padding-bottom: 24px; }
+
+/* Card DL body */
+.kph-card-dl { padding: 6px 20px 14px; }
+.kph-card-dl dl { width: 100%; }
+.kph-card-dl dl dt { flex-shrink: 0; max-width: 45%; }
+.kph-card-dl dl dd { min-width: 0; max-width: 55%; overflow-wrap: break-word; word-break: break-word; text-align: right; }
+@keyframes kph-tab-in {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══ Option C: Dark Header Card System ══════════════════════════════════ */
+/* — Card wrapper ————————————————————————————————————————————————————————— */
+.kph-tab-panel [class~="rounded-2xl"] {
+    background: #fff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 14px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.07) !important;
+    margin-bottom: 20px !important;
+}
+/* — Dark header band ————————————————————————————————————————————————————— */
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] {
+    background: #282F3B !important;
+    border-bottom: 1px solid rgba(255,255,255,.08) !important;
+    padding: 11px 20px !important;
+}
+/* — Header text: white, uppercase small caps ————————————————————————————— */
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] span:not([class~="fi-badge"]) {
+    color: #fff !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: .05em !important;
+    text-transform: uppercase !important;
+}
+/* — Header p / h3 ————————————————————————————————————————————————————————  */
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] p,
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] h3 {
+    color: rgba(255,255,255,.82) !important;
+}
+/* — Header icons ————————————————————————————————————————————————————————— */
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] svg {
+    color: rgba(255,255,255,.75) !important;
+}
+/* — Header badges ———————————————————————————————————————————————————————— */
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] [class~="fi-badge"] {
+    background: rgba(255,193,5,.18) !important;
+    color: #FFC105 !important;
+    border-color: rgba(255,193,5,.3) !important;
+}
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] [class~="fi-color-success"][class~="fi-badge"] {
+    background: rgba(34,197,94,.18) !important;
+    color: #4ade80 !important;
+    border-color: rgba(34,197,94,.3) !important;
+}
+.kph-tab-panel [class~="rounded-2xl"] > [class~="border-b"] [class~="fi-color-danger"][class~="fi-badge"] {
+    background: rgba(239,68,68,.18) !important;
+    color: #f87171 !important;
+    border-color: rgba(239,68,68,.3) !important;
+}
+/* — Card body: consistent padding ———————————————————————————————————————— */
+.kph-tab-panel [class~="rounded-2xl"] > div:not([class~="border-b"]):not(.kph-card-dl) {
+    padding: 20px 20px !important;
+}
+/* — Label → value spacing (all tracking-widest small-caps labels) ————————— */
+.kph-tab-panel [class~="rounded-2xl"] p[class~="tracking-widest"] {
+    margin-bottom: 6px !important;
+}
+
+/* ═══ Assessment Department Cards ════════════════════════════════════════ */
+.kph-assessment-card {
+    background: #fff;
+    border-color: #e5e7eb !important;
+    border-radius: 12px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.kph-assessment-card:hover {
+    border-color: #c1c7d0 !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,.10) !important;
+    transform: translateY(-1px);
+}
+/* — Header row ——————————————————————————————————————————————————————————— */
+.kph-assessment-card > .flex:first-child {
+    background: #282F3B;
+    padding: 11px 14px;
+}
+.kph-assessment-card > .flex:first-child > [class~="rounded-lg"] {
+    background: rgba(255,255,255,.12) !important;
+}
+.kph-assessment-card > .flex:first-child svg {
+    color: rgba(255,255,255,.82) !important;
+}
+.kph-assessment-card > .flex:first-child p {
+    color: #fff !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .05em !important;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+}
+/* — Description ——————————————————————————————————————————————————————————— */
+.kph-ac-desc {
+    padding: 12px 14px 8px;
+    font-size: 11.5px !important;
+    color: #6b7280 !important;
+    line-height: 1.55;
+    flex: 1;
+    margin: 0 !important;
+}
+/* — Bottom link ——————————————————————————————————————————————————————————— */
+.kph-ac-link {
+    padding: 8px 14px 11px;
+    border-top: 1px solid #f3f4f6;
+    display: block;
+    font-size: 11.5px !important;
+    font-weight: 500;
+    color: #b0b8c4 !important;
+    text-decoration: none;
+}
+.kph-ac-link--active {
+    color: #29972E !important;
+    font-weight: 600 !important;
+}
+.kph-ac-link--active:hover { text-decoration: underline; }
+
+/* Sidebar */
+.kph-sidebar-wrap { border-radius: 1rem; border: 1px solid #e2e8f0; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,.08); overflow: hidden; }
+.kph-sidebar-group-lbl { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; color: #9ca3af; padding: 12px 16px 4px; }
+.kph-nav-btn { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; color: #6b7280; background: transparent; border: none; text-align: left; cursor: pointer; transition: background .12s, color .12s; margin-bottom: 2px; }
+.kph-nav-btn:hover { background: #f8fafc; color: #282F3B; }
+.kph-nav-btn.kph-active { background: #000000 !important; color: #ffffff !important; font-weight: 600; border-left: 3px solid #FFC105; border-radius: 0 8px 8px 0; padding-left: 9px; }
+.kph-nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.kph-active .kph-nav-icon { color: #FFC105; }
+</style>
+
 @if(!$client)
     <x-filament::section>
         <div class="flex flex-col items-center justify-center py-24 space-y-4">
@@ -27,129 +189,119 @@
 <div class="relative space-y-6">
     <div class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[30rem] rounded-[2rem] bg-[linear-gradient(180deg,_rgba(248,250,252,0.98),_rgba(241,245,249,0.88))] dark:bg-[linear-gradient(180deg,_rgba(15,23,42,0.94),_rgba(2,6,23,0.82))]"></div>
 
-<div class="relative overflow-hidden rounded-[1.5rem] border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/94 shadow-[0_18px_50px_-34px_rgba(15,23,42,0.28)] backdrop-blur">
-    <div class="absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-slate-50 via-white to-sky-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/20"></div>
-    <div class="p-6 sm:p-7">
+<div class="kph-header-card">
 
-        {{-- Top row: avatar + identity + stats --}}
-            <div class="relative flex flex-col sm:flex-row gap-6">
+    {{-- KISE dark band: avatar + identity + stats --}}
+    <div class="kph-dark-band">
+        <div class="flex flex-col sm:flex-row gap-5">
 
             {{-- Avatar --}}
             <div class="relative flex-shrink-0 self-start">
                 @if($client->photo)
                     <img src="{{ asset('storage/' . $client->photo) }}"
-                         class="w-18 h-18 rounded-2xl object-cover shadow ring-2 ring-gray-100 dark:ring-gray-700 w-[72px] h-[72px]"/>
+                         style="width:72px;height:72px;border-radius:14px;object-fit:cover;border:3px solid rgba(255,255,255,.18);"/>
                 @else
-                    <div class="w-[72px] h-[72px] rounded-2xl bg-gradient-to-br {{ $avatarGradient }} flex items-center justify-center text-white text-2xl font-bold shadow-md select-none">
+                    <div style="width:72px;height:72px;border-radius:14px;background:linear-gradient(135deg,{{ $gender==='female'?'#f43f5e,#e11d48':($gender==='male'?'#3b82f6,#1d4ed8':'#64748b,#475569') }});display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;font-weight:800;border:3px solid rgba(255,255,255,.18);flex-shrink:0;">
                         {{ strtoupper(substr($client->first_name ?? '?', 0, 1) . substr($client->last_name ?? '', 0, 1)) }}
                     </div>
                 @endif
-                <span class="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full border-[3px] border-white dark:border-gray-900 shadow-sm
-                    {{ $activeVisit ? 'bg-emerald-400' : 'bg-gray-300 dark:bg-gray-600' }}"
-                    title="{{ $activeVisit ? 'Active visit' : 'No active visit' }}">
-                </span>
+                <span style="position:absolute;bottom:-5px;right:-5px;width:16px;height:16px;border-radius:50%;border:3px solid #282F3B;background:{{ $activeVisit ? '#22c55e' : '#6b7280' }};"
+                      title="{{ $activeVisit ? 'Active visit' : 'No active visit' }}"></span>
             </div>
 
-            {{-- Identity column --}}
+            {{-- Identity --}}
             <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight">
-                        {{ $client->full_name }}
-                    </h1>
+                <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:10px;">
+                    <h1 class="kph-client-name">{{ $client->full_name }}</h1>
                     @if($age)
-                        <span class="text-sm text-gray-500 dark:text-gray-400 font-medium">{{ $age }} yrs</span>
+                        <span style="color:rgba(255,255,255,.5);font-size:.82rem;font-weight:500;">{{ $age }} yrs</span>
                     @endif
                     @if($gender)
-                        <span class="text-sm text-gray-400 dark:text-gray-500">{{ ucfirst($gender) }}</span>
+                        <span style="color:rgba(255,255,255,.35);font-size:.78rem;">{{ ucfirst($gender) }}</span>
                     @endif
                 </div>
 
-                {{-- UCI + IDs row --}}
-                <div class="flex flex-wrap items-center gap-2.5 mt-2.5">
-                    <span class="font-mono text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-2.5 py-1 rounded-md shadow-sm">
-                        {{ $client->uci }}
-                    </span>
+                {{-- UCI + location IDs --}}
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;">
+                    <span class="kph-uci">{{ $client->uci }}</span>
+                    @if($client->county)
+                        <span style="color:rgba(255,255,255,.38);font-size:.72rem;display:inline-flex;align-items:center;gap:3px;">
+                            <x-filament::icon icon="heroicon-m-map-pin" class="w-3 h-3"/>{{ $client->county->name }}
+                        </span>
+                    @endif
                     @if($client->sha_number)
-                        <span class="inline-flex items-center gap-1 text-xs bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 px-2 py-0.5 rounded-md border border-teal-200 dark:border-teal-700 font-medium">
-                            <x-filament::icon icon="heroicon-m-shield-check" class="w-3 h-3"/>
-                            SHA
+                        <span class="kph-band-badge" style="background:rgba(20,184,166,.15);color:#5eead4;border:1px solid rgba(20,184,166,.3);">
+                            <x-filament::icon icon="heroicon-m-shield-check" class="w-3 h-3"/>SHA
                         </span>
                     @endif
                     @if($client->ncpwd_number)
-                        <span class="inline-flex items-center gap-1 text-xs bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-md border border-violet-200 dark:border-violet-700 font-medium">
-                            <x-filament::icon icon="heroicon-m-star" class="w-3 h-3"/>
-                            NCPWD
+                        <span class="kph-band-badge" style="background:rgba(139,92,246,.15);color:#c4b5fd;border:1px solid rgba(139,92,246,.3);">
+                            <x-filament::icon icon="heroicon-m-star" class="w-3 h-3"/>NCPWD
                         </span>
                     @endif
-                    @if($client->county)
-                        <span class="text-xs text-gray-400 dark:text-gray-500">
-                            <x-filament::icon icon="heroicon-m-map-pin" class="w-3 h-3 inline -mt-0.5"/>
-                            {{ $client->county->name }}
+                    @if($client->phone_primary)
+                        <span style="color:rgba(255,255,255,.35);font-size:.72rem;display:inline-flex;align-items:center;gap:3px;">
+                            <x-filament::icon icon="heroicon-m-phone" class="w-3 h-3"/>{{ $client->phone_primary }}
                         </span>
                     @endif
                 </div>
 
                 {{-- Status badges --}}
-                <div class="flex flex-wrap items-center gap-2 mt-3">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
                     @if($activeVisit)
-                        <span class="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-700">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                        <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.3);padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;">
+                            <span class="animate-pulse" style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
                             {{ ucfirst(str_replace('_', ' ', $activeVisit->current_stage)) }}
                         </span>
                     @endif
                     @if($this->activeInsurances->isNotEmpty())
-                        <x-filament::badge color="info" icon="heroicon-m-shield-check" size="sm">
-                            {{ $this->activeInsurances->count() }} Insurance
-                        </x-filament::badge>
+                        <span class="kph-band-badge" style="background:rgba(14,165,233,.15);color:#7dd3fc;border:1px solid rgba(14,165,233,.3);">
+                            <x-filament::icon icon="heroicon-m-shield-check" class="w-3 h-3"/>{{ $this->activeInsurances->count() }} Insurance
+                        </span>
                     @endif
                     @if($this->allergies->isNotEmpty())
-                        <x-filament::badge color="danger" icon="heroicon-m-exclamation-triangle" size="sm">
-                            {{ $this->allergies->count() }} {{ $this->allergies->count() === 1 ? 'Allergy' : 'Allergies' }}
-                        </x-filament::badge>
-                    @endif
-                    @if($client->phone_primary)
-                        <span class="text-xs text-gray-400 dark:text-gray-500 ml-1">
-                            <x-filament::icon icon="heroicon-m-phone" class="w-3 h-3 inline -mt-0.5 mr-0.5"/>{{ $client->phone_primary }}
+                        <span class="kph-band-badge" style="background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);">
+                            <x-filament::icon icon="heroicon-m-exclamation-triangle" class="w-3 h-3"/>{{ $this->allergies->count() }} {{ $this->allergies->count() === 1 ? 'Allergy' : 'Allergies' }}
                         </span>
                     @endif
                 </div>
             </div>
 
-            {{-- Stats strip --}}
-            <div class="flex sm:flex-col gap-3 sm:gap-3 sm:items-end justify-start sm:justify-center flex-shrink-0">
-                <div class="flex gap-3">
-                    <div class="min-w-[78px] rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-3 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800/85">
-                        <p class="text-xl font-bold text-slate-700 dark:text-slate-100 leading-none">{{ $totalVisits }}</p>
-                        <p class="mt-1 text-[10px] uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Visits</p>
+            {{-- Stats --}}
+            <div class="flex sm:flex-col gap-2 sm:items-end justify-start flex-shrink-0">
+                <div class="flex gap-2">
+                    <div class="kph-stat-box">
+                        <p class="kph-stat-num" style="color:#ffffff;">{{ $totalVisits }}</p>
+                        <p class="kph-stat-lbl">Visits</p>
                     </div>
-                    <div class="min-w-[78px] rounded-2xl border border-sky-200 bg-sky-50/90 px-4 py-3 text-center shadow-sm dark:border-sky-900/50 dark:bg-sky-950/25">
-                        <p class="text-xl font-bold text-sky-700 dark:text-sky-200 leading-none">{{ $this->upcomingAppointments->count() }}</p>
-                        <p class="mt-1 text-[10px] uppercase tracking-[0.22em] text-sky-600/80 dark:text-sky-300/70">Appts</p>
+                    <div class="kph-stat-box">
+                        <p class="kph-stat-num" style="color:#FFC105;">{{ $this->upcomingAppointments->count() }}</p>
+                        <p class="kph-stat-lbl">Appts</p>
                     </div>
-                    <div class="min-w-[78px] rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-center shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/25">
-                        <p class="text-xl font-bold text-emerald-700 dark:text-emerald-200 leading-none">{{ $this->schoolPlacements->count() }}</p>
-                        <p class="mt-1 text-[10px] uppercase tracking-[0.22em] text-emerald-600/80 dark:text-emerald-300/70">Schools</p>
+                    <div class="kph-stat-box">
+                        <p class="kph-stat-num" style="color:#86efac;">{{ $this->schoolPlacements->count() }}</p>
+                        <p class="kph-stat-lbl">Schools</p>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        {{-- Action bar --}}
-        <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-200/80 pt-5 dark:border-slate-800/80">
-            @if($activeVisit)
-                <x-filament::button size="sm" color="primary" icon="heroicon-m-plus-circle" class="!rounded-lg !px-4 !py-2.5 !shadow-sm"
-                    wire:click="$dispatch('open-modal', { id: 'request-service-modal' })">
-                    Request Service
-                </x-filament::button>
-            @endif
-            <x-filament::button size="sm" color="success" icon="heroicon-m-calendar-days" class="!rounded-lg !px-4 !py-2.5 !shadow-sm"
-                wire:click="$dispatch('open-modal', { id: 'appointment-modal' })">
-                Book Appointment
+    {{-- Action bar --}}
+    <div class="kph-action-bar">
+        @if($activeVisit)
+            <x-filament::button size="sm" color="primary" icon="heroicon-m-plus-circle" class="!rounded-lg !px-4 !py-2.5 !shadow-sm"
+                wire:click="$dispatch('open-modal', { id: 'request-service-modal' })">
+                Request Service
             </x-filament::button>
-            <x-filament::button size="sm" color="gray" icon="heroicon-m-arrow-path" class="!rounded-lg !border !border-slate-200 !bg-white !px-4 !py-2.5 !text-slate-700 shadow-sm dark:!border-slate-700 dark:!bg-slate-800 dark:!text-slate-200" wire:click="refreshData">
-                Refresh
-            </x-filament::button>
-        </div>
+        @endif
+        <x-filament::button size="sm" color="success" icon="heroicon-m-calendar-days" class="!rounded-lg !px-4 !py-2.5 !shadow-sm"
+            wire:click="$dispatch('open-modal', { id: 'appointment-modal' })">
+            Book Appointment
+        </x-filament::button>
+        <x-filament::button size="sm" color="gray" icon="heroicon-m-arrow-path" class="!rounded-lg !border !border-slate-200 !bg-white !px-4 !py-2.5 !text-slate-700 shadow-sm" wire:click="refreshData">
+            Refresh
+        </x-filament::button>
     </div>
 </div>
 
@@ -208,8 +360,8 @@ $navGroups = [
                         wire:click="setActiveTab('{{ $tab['id'] }}')"
                         class="flex-shrink-0 flex items-center gap-1.5 rounded-lg px-4 py-3 text-sm font-medium border-b-2 transition-colors
                             {{ $activeTab === $tab['id']
-                                ? 'border-primary-500 bg-sky-50 text-sky-700 shadow-sm dark:bg-sky-900/20 dark:text-sky-300'
-                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:bg-slate-50 hover:text-gray-700 dark:hover:bg-slate-800/70 dark:hover:text-gray-200' }}"
+                                ? 'border-yellow-400 bg-gray-900 text-white font-semibold'
+                                : 'border-transparent text-gray-500 hover:bg-slate-50 hover:text-gray-700' }}"
                     >
                         <x-filament::icon :icon="$tab['icon']" class="w-4 h-4 flex-shrink-0"/>
                         <span>{{ $tab['label'] }}</span>
@@ -232,23 +384,18 @@ $navGroups = [
 
     {{-- Vertical Sidebar (desktop only) --}}
     <aside class="hidden md:block w-52 flex-shrink-0 sticky top-4 self-start">
-        <div class="rounded-2xl border border-slate-200 bg-white/96 shadow-[0_14px_36px_-28px_rgba(15,23,42,0.18)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/92 overflow-hidden">
+        <div class="kph-sidebar-wrap">
             @foreach($navGroups as $group)
-                <div class="px-3 pt-4 pb-2">
-                    <p class="px-2.5 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                        {{ $group['label'] }}
-                    </p>
+                <div class="px-2 pt-3 pb-1.5">
+                    <p class="kph-sidebar-group-lbl">{{ $group['label'] }}</p>
                     @foreach($group['tabs'] as $tab)
                         <button
                             wire:click="setActiveTab('{{ $tab['id'] }}')"
-                            class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors mb-1
-                                {{ $activeTab === $tab['id']
-                                    ? 'border border-sky-200 bg-sky-50 text-sky-700 shadow-sm dark:border-sky-900/40 dark:bg-sky-900/20 dark:text-sky-300'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-slate-800/70 hover:text-gray-900 dark:hover:text-gray-100' }}"
+                            class="kph-nav-btn {{ $activeTab === $tab['id'] ? 'kph-active' : '' }}"
                         >
                             <x-filament::icon
                                 :icon="$tab['icon']"
-                                class="w-4 h-4 flex-shrink-0 {{ $activeTab === $tab['id'] ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500' }}"
+                                class="kph-nav-icon {{ $activeTab === $tab['id'] ? 'text-yellow-400' : 'text-gray-400' }}"
                             />
                             <span class="flex-1 text-left truncate">{{ $tab['label'] }}</span>
                             @if(!empty($tab['badge']))
@@ -260,7 +407,7 @@ $navGroups = [
                     @endforeach
                 </div>
                 @if(!$loop->last)
-                    <div class="mx-3 border-t border-gray-100 dark:border-gray-800 my-1"></div>
+                    <div style="border-top:1px solid #f1f5f9;margin:2px 12px;"></div>
                 @endif
             @endforeach
             <div class="h-2"></div>
@@ -268,7 +415,8 @@ $navGroups = [
     </aside>
 
     {{-- Tab Content --}}
-    <div class="flex-1 min-w-0 space-y-6">
+    <div class="flex-1 min-w-0">
+    <div class="kph-tab-panel space-y-6 px-1" wire:key="tab-{{ $activeTab }}">
 
 {{-- ============================================================ --}}
 {{-- OVERVIEW TAB                                                 --}}
@@ -487,7 +635,7 @@ $navGroups = [
                         <x-filament::icon icon="heroicon-m-shield-check" class="w-4 h-4 text-emerald-500"/>
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Insurance</span>
                 </div>
-                <div class="p-5 space-y-3">
+                <div class="p-6 space-y-3">
                     @forelse($this->activeInsurances as $ins)
                         <div class="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/70">
                             <div>
@@ -512,7 +660,7 @@ $navGroups = [
                         <x-filament::icon icon="heroicon-m-calendar-days" class="w-4 h-4 text-sky-500"/>
                         <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Next Appointments</span>
                     </div>
-                    <div class="p-5 space-y-3">
+                    <div class="p-6 space-y-3">
                         @foreach($this->upcomingAppointments->take(3) as $apt)
                             <div class="flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/70">
                                 <div class="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-sky-100 text-center dark:bg-sky-900/30">
@@ -541,11 +689,13 @@ $navGroups = [
                         <x-filament::icon icon="heroicon-m-user-circle" class="w-4 h-4 text-slate-500"/>
                         <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Disability Profile</span>
                     </div>
-                    <div class="p-5 space-y-4">
+                    <div class="p-6 space-y-4">
                         @if($dis->disability_categories)
                             <div class="flex flex-wrap gap-2">
                                 @foreach((array) $dis->disability_categories as $cat)
-                                    <x-filament::badge color="warning" size="sm">{{ ucwords(str_replace('_', ' ', $cat)) }}</x-filament::badge>
+                                    @if(is_string($cat) && $cat !== '')
+                                        <x-filament::badge color="warning" size="sm">{{ ucwords(str_replace('_', ' ', $cat)) }}</x-filament::badge>
+                                    @endif
                                 @endforeach
                             </div>
                         @endif
@@ -560,7 +710,9 @@ $navGroups = [
                                 <p class="text-[10px] uppercase tracking-widest text-amber-500">Assistive Tech</p>
                                 <div class="flex flex-wrap gap-2 mt-1">
                                     @foreach((array)$dis->assistive_technology as $at)
-                                        <x-filament::badge color="info" size="sm">{{ ucwords(str_replace('_', ' ', $at)) }}</x-filament::badge>
+                                        @if(is_string($at) && $at !== '')
+                                            <x-filament::badge color="info" size="sm">{{ ucwords(str_replace('_', ' ', $at)) }}</x-filament::badge>
+                                        @endif
                                     @endforeach
                                 </div>
                             </div>
@@ -582,7 +734,6 @@ $navGroups = [
         <div class="space-y-5">
             {{-- Visit Header Card --}}
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
-                <div class="h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
                 <div class="bg-slate-50 px-5 py-4 border-b border-slate-200 dark:border-slate-800 dark:bg-slate-900 flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
                         <x-filament::icon icon="heroicon-m-signal" class="w-3.5 h-3.5 text-emerald-500"/>
@@ -621,7 +772,6 @@ $navGroups = [
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {{-- Triage Card --}}
                 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
-                    <div class="h-0.5 bg-gradient-to-r from-rose-400 to-rose-600"></div>
                     <div class="bg-slate-50 px-5 py-4 border-b border-slate-200 dark:border-slate-800 dark:bg-slate-900 flex items-center gap-3">
                         <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center flex-shrink-0">
                             <x-filament::icon icon="heroicon-m-heart" class="w-3.5 h-3.5 text-rose-500"/>
@@ -672,7 +822,6 @@ $navGroups = [
 
                 {{-- Intake Card --}}
                 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
-                    <div class="h-0.5 bg-gradient-to-r from-blue-400 to-blue-600"></div>
                     <div class="bg-slate-50 px-5 py-4 border-b border-slate-200 dark:border-slate-800 dark:bg-slate-900 flex items-center gap-3">
                         <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
                             <x-filament::icon icon="heroicon-m-clipboard-document" class="w-3.5 h-3.5 text-blue-500"/>
@@ -743,7 +892,6 @@ $navGroups = [
             {{-- Billing Summary --}}
             @if($activeVisit->invoices?->isNotEmpty())
                 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96" x-data="{ open: false }">
-                    <div class="h-0.5 bg-gradient-to-r from-teal-400 to-teal-600"></div>
                     <button @click="open = !open" class="w-full bg-slate-50 px-5 py-4 border-b border-slate-200 dark:border-slate-800 dark:bg-slate-900 flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors">
                         <div class="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center flex-shrink-0">
                             <x-filament::icon icon="heroicon-m-banknotes" class="w-3.5 h-3.5 text-teal-500"/>
@@ -787,8 +935,7 @@ $navGroups = [
 {{-- ASSESSMENTS TAB                                              --}}
 {{-- ============================================================ --}}
 @if($activeTab === 'assessments')
-    <div class="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
-        <div class="h-0.5 bg-sky-500/70"></div>
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
         <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
             <div class="w-7 h-7 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 flex items-center justify-center flex-shrink-0">
                 <x-filament::icon icon="heroicon-m-beaker" class="w-3.5 h-3.5 text-cyan-500"/>
@@ -801,18 +948,18 @@ $navGroups = [
         <div class="p-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 @foreach($this->assessmentLinks as $link)
-                    <div class="group flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 hover:border-sky-300 dark:hover:border-sky-700 hover:shadow-md transition-all">
+                    <div class="kph-assessment-card group flex flex-col rounded-xl border overflow-hidden transition-all">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-xl bg-{{ $link['color'] }}-50 dark:bg-{{ $link['color'] }}-900/20 flex items-center justify-center flex-shrink-0">
-                                <x-filament::icon :icon="$link['icon']" class="w-5 h-5 text-{{ $link['color'] }}-600 dark:text-{{ $link['color'] }}-400"/>
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <x-filament::icon :icon="$link['icon']" class="w-4 h-4"/>
                             </div>
-                            <p class="text-sm font-semibold text-gray-900 dark:text-white leading-tight">{{ $link['label'] }}</p>
+                            <p class="leading-tight">{{ $link['label'] }}</p>
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{{ $link['description'] }}</p>
+                        <p class="kph-ac-desc">{{ $link['description'] }}</p>
                         @if($link['url'])
-                            <a href="{{ $link['url'] }}" class="mt-auto text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline">Open Assessment →</a>
+                            <a href="{{ $link['url'] }}" class="kph-ac-link kph-ac-link--active">Open Assessment →</a>
                         @else
-                            <span class="mt-auto text-xs text-gray-300 dark:text-gray-600">Link not configured</span>
+                            <span class="kph-ac-link">Link not configured</span>
                         @endif
                     </div>
                 @endforeach
@@ -822,7 +969,6 @@ $navGroups = [
 
     {{-- Assessment History (collapsible) --}}
     <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden" x-data="{ open: false }">
-        <div class="h-0.5 bg-gradient-to-r from-cyan-400 to-cyan-600"></div>
         <button @click="open = !open" class="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
             <div class="w-7 h-7 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 flex items-center justify-center flex-shrink-0">
                 <x-filament::icon icon="heroicon-m-document-text" class="w-3.5 h-3.5 text-cyan-500"/>
@@ -843,7 +989,6 @@ $navGroups = [
 {{-- ============================================================ --}}
 @if($activeTab === 'services')
     <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-        <div class="h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600"></div>
         <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
             <div class="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
                 <x-filament::icon icon="heroicon-m-clipboard-document-check" class="w-3.5 h-3.5 text-emerald-500"/>
@@ -920,15 +1065,14 @@ $navGroups = [
         </x-filament::button>
     </div>
 
-    <div class="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
-        <div class="h-0.5 bg-sky-500/70"></div>
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-28px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900/96">
         <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
             <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0">
                 <x-filament::icon icon="heroicon-m-calendar-days" class="w-3.5 h-3.5 text-sky-500"/>
             </div>
             <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Upcoming Appointments</h3>
         </div>
-        <div class="p-5">
+        <div class="p-6">
         @forelse($this->upcomingAppointments as $apt)
             <div class="flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/45 mb-3 last:mb-0">
                 <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-sky-100 dark:bg-sky-900/30 flex flex-col items-center justify-center text-center">
@@ -978,7 +1122,6 @@ $navGroups = [
 
     @if($this->pastAppointments->isNotEmpty())
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden" x-data="{ open: false }">
-            <div class="h-0.5 bg-gradient-to-r from-gray-300 to-gray-400"></div>
             <button @click="open = !open" class="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                 <div class="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-clock" class="w-3.5 h-3.5 text-gray-500"/>
@@ -1026,14 +1169,13 @@ $navGroups = [
 
         {{-- Internal Referrals --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-violet-400 to-violet-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-arrow-path-rounded-square" class="w-3.5 h-3.5 text-violet-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Internal Referrals</h3>
             </div>
-            <div class="p-5">
+            <div class="p-6">
             @forelse($this->internalReferrals as $ref)
                 <div class="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20 mb-3 last:mb-0 hover:border-gray-200 transition-colors">
                     <div class="flex items-start justify-between mb-2">
@@ -1068,14 +1210,13 @@ $navGroups = [
 
         {{-- External Referrals --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-indigo-400 to-indigo-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-arrow-top-right-on-square" class="w-3.5 h-3.5 text-indigo-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">External Referrals</h3>
             </div>
-            <div class="p-5">
+            <div class="p-6">
             @forelse($this->externalReferrals as $ref)
                 <div class="p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/20 mb-3 last:mb-0">
                     <div class="flex items-start justify-between mb-2">
@@ -1119,58 +1260,61 @@ $navGroups = [
     <div class="space-y-5">
 
         {{-- Medical History --}}
-        @php $mh = $this->medicalHistory; @endphp
+        @php
+            $mh = $this->medicalHistory;
+            // Safely render a field that may be a string or JSON array
+            $mhStr = fn($v) => is_array($v) ? implode(', ', array_filter($v, 'is_string')) : (string)($v ?? '');
+        @endphp
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-rose-400 to-rose-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-document-text" class="w-3.5 h-3.5 text-rose-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Medical History</h3>
             </div>
-            <div class="p-5">
+            <div class="p-6">
             @if($mh)
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     @if($mh->medical_conditions)
                         <div class="p-3.5 rounded-xl bg-rose-50/40 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30">
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-rose-400 mb-1.5">Medical Conditions</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mh->medical_conditions }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mhStr($mh->medical_conditions) }}</p>
                         </div>
                     @endif
                     @if($mh->current_medications)
                         <div class="p-3.5 rounded-xl bg-blue-50/40 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-blue-400 mb-1.5">Current Medications</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mh->current_medications }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mhStr($mh->current_medications) }}</p>
                         </div>
                     @endif
                     @if($mh->surgical_history)
                         <div class="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Surgical History</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mh->surgical_history }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mhStr($mh->surgical_history) }}</p>
                         </div>
                     @endif
                     @if($mh->family_medical_history)
                         <div class="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Family Medical History</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mh->family_medical_history }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mhStr($mh->family_medical_history) }}</p>
                         </div>
                     @endif
                     @if($mh->developmental_concerns_notes)
                         <div class="md:col-span-2 p-3.5 rounded-xl bg-amber-50/40 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-amber-400 mb-1.5">Developmental Concerns</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mh->developmental_concerns_notes }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $mhStr($mh->developmental_concerns_notes) }}</p>
                         </div>
                     @endif
                     @if($mh->immunization_status)
                         <div>
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Immunization Status</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300">{{ $mh->immunization_status }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300">{{ $mhStr($mh->immunization_status) }}</p>
                         </div>
                     @endif
                     @if($mh->assistive_devices_notes)
                         <div>
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1">Assistive Devices</p>
-                            <p class="text-sm text-gray-700 dark:text-gray-300">{{ $mh->assistive_devices_notes }}</p>
+                            <p class="text-sm text-gray-700 dark:text-gray-300">{{ $mhStr($mh->assistive_devices_notes) }}</p>
                         </div>
                     @endif
                 </div>
@@ -1188,14 +1332,13 @@ $navGroups = [
         {{-- Disability --}}
         @php $dis = $this->disability; @endphp
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-amber-400 to-amber-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-user-circle" class="w-3.5 h-3.5 text-amber-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Disability Profile</h3>
             </div>
-            <div class="p-5">
+            <div class="p-6">
             @if($dis)
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     @if($dis->disability_categories)
@@ -1203,7 +1346,9 @@ $navGroups = [
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Disability Categories</p>
                             <div class="flex flex-wrap gap-2">
                                 @foreach((array) $dis->disability_categories as $cat)
-                                    <x-filament::badge color="warning">{{ ucwords(str_replace('_', ' ', $cat)) }}</x-filament::badge>
+                                    @if(is_string($cat) && $cat !== '')
+                                        <x-filament::badge color="warning">{{ ucwords(str_replace('_', ' ', $cat)) }}</x-filament::badge>
+                                    @endif
                                 @endforeach
                             </div>
                         </div>
@@ -1225,7 +1370,9 @@ $navGroups = [
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">Assistive Technology</p>
                             <div class="flex flex-wrap gap-2">
                                 @foreach((array) $dis->assistive_technology as $tech)
-                                    <x-filament::badge color="info" size="sm">{{ ucwords(str_replace('_', ' ', $tech)) }}</x-filament::badge>
+                                    @if(is_string($tech) && $tech !== '')
+                                        <x-filament::badge color="info" size="sm">{{ ucwords(str_replace('_', ' ', $tech)) }}</x-filament::badge>
+                                    @endif
                                 @endforeach
                             </div>
                         </div>
@@ -1250,14 +1397,13 @@ $navGroups = [
 
         {{-- Allergies --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-red-400 to-red-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-exclamation-triangle" class="w-3.5 h-3.5 text-red-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Allergies</h3>
             </div>
-            <div class="p-5">
+            <div class="p-6">
             @forelse($this->allergies as $allergy)
                 <div class="flex items-start gap-4 p-4 rounded-xl border-l-4 border-red-400 bg-red-50 dark:bg-red-900/20 mb-3 last:mb-0">
                     <div class="flex-1">
@@ -1312,14 +1458,13 @@ $navGroups = [
 
         {{-- Personal Information --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-indigo-400 to-indigo-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-identification" class="w-3.5 h-3.5 text-indigo-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Personal Information</h3>
             </div>
-            <div class="px-5 py-2">
+            <div class="kph-card-dl">
                 <dl>
                     @foreach($demo['basic'] as $label => $value)
                         @if($value && $value !== 'N/A')
@@ -1335,14 +1480,13 @@ $navGroups = [
 
         {{-- Contact Information --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-indigo-400 to-indigo-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-phone" class="w-3.5 h-3.5 text-indigo-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Contact Information</h3>
             </div>
-            <div class="px-5 py-2">
+            <div class="kph-card-dl">
                 <dl>
                     @foreach($demo['contact'] as $label => $value)
                         @if($value && $value !== 'N/A')
@@ -1358,14 +1502,13 @@ $navGroups = [
 
         {{-- Address --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-sky-400 to-sky-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-map-pin" class="w-3.5 h-3.5 text-sky-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Address</h3>
             </div>
-            <div class="px-5 py-2">
+            <div class="kph-card-dl">
                 <dl>
                     @foreach($demo['address'] as $label => $value)
                         @if($value && $value !== 'N/A')
@@ -1381,14 +1524,13 @@ $navGroups = [
 
         {{-- Socio-Demographics --}}
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-sky-400 to-sky-600"></div>
             <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                 <div class="w-7 h-7 rounded-lg bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0">
                     <x-filament::icon icon="heroicon-m-user-group" class="w-3.5 h-3.5 text-sky-500"/>
                 </div>
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Socio-Demographics</h3>
             </div>
-            <div class="px-5 py-2">
+            <div class="kph-card-dl">
             @if($socio)
                 <dl>
                     @foreach([
@@ -1411,7 +1553,9 @@ $navGroups = [
                             <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-1.5">Source of Support</p>
                             <div class="flex flex-wrap gap-1.5">
                                 @foreach((array)$socio->source_of_support as $src)
-                                    <x-filament::badge color="gray" size="sm">{{ ucwords(str_replace('_', ' ', $src)) }}</x-filament::badge>
+                                    @if(is_string($src) && $src !== '')
+                                        <x-filament::badge color="gray" size="sm">{{ ucwords(str_replace('_', ' ', $src)) }}</x-filament::badge>
+                                    @endif
                                 @endforeach
                             </div>
                         </div>
@@ -1431,14 +1575,13 @@ $navGroups = [
         {{-- Education & Employment --}}
         @if($edu)
             <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden lg:col-span-2">
-                <div class="h-0.5 bg-gradient-to-r from-violet-400 to-violet-600"></div>
                 <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center flex-shrink-0">
                         <x-filament::icon icon="heroicon-m-academic-cap" class="w-3.5 h-3.5 text-violet-500"/>
                     </div>
                     <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Education & Employment</h3>
                 </div>
-                <div class="p-5">
+                <div class="p-6">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         @foreach([
                             'Education Level'   => $edu->education_level,
@@ -1471,7 +1614,6 @@ $navGroups = [
         {{-- Intake: Family & Social History --}}
         @if($li && ($li->family_history || $li->social_history || $li->previous_interventions || $li->educational_background))
             <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden lg:col-span-2" x-data="{ open: true }">
-                <div class="h-0.5 bg-gradient-to-r from-blue-400 to-blue-600"></div>
                 <button @click="open = !open" class="w-full px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                     <div class="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
                         <x-filament::icon icon="heroicon-m-clipboard-document-list" class="w-3.5 h-3.5 text-blue-500"/>
@@ -1480,7 +1622,7 @@ $navGroups = [
                     <x-filament::icon icon="heroicon-m-chevron-down" class="w-4 h-4 text-gray-400 transition-transform duration-200" ::class="open ? 'rotate-180' : ''"/>
                 </button>
                 <div x-show="open" x-collapse>
-                    <div class="p-5">
+                    <div class="p-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             @if($li->family_history)
                                 <div class="p-3.5 rounded-xl bg-blue-50/40 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
@@ -1531,7 +1673,6 @@ $navGroups = [
 @if($activeTab === 'school')
     @forelse($this->schoolPlacements as $placement)
         <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-            <div class="h-0.5 bg-gradient-to-r from-sky-400 to-sky-600"></div>
             <div class="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-900/20 flex items-center justify-center flex-shrink-0">
@@ -1549,7 +1690,7 @@ $navGroups = [
                     {{ ucfirst($placement->status) }}
                 </x-filament::badge>
             </div>
-            <div class="p-5 space-y-4">
+            <div class="p-6 space-y-4">
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                         <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Placement Type</p>
@@ -1811,7 +1952,6 @@ $navGroups = [
         <div class="lg:col-span-2 space-y-5">
             {{-- MDT Summary --}}
             <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-                <div class="h-0.5 bg-gradient-to-r from-purple-400 to-purple-600"></div>
                 <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center flex-shrink-0">
                         <x-filament::icon icon="heroicon-m-users" class="w-3.5 h-3.5 text-purple-500"/>
@@ -1821,7 +1961,7 @@ $navGroups = [
                         <p class="text-xs text-gray-400 mt-0.5">Consolidated input from all clinical departments.</p>
                     </div>
                 </div>
-                <div class="p-5">
+                <div class="p-6">
                     @if($activeVisit)
                         @php $depts = $activeVisit->serviceBookings->pluck('service.department.name')->filter()->unique()->values(); @endphp
                         @if($depts->isNotEmpty())
@@ -1848,7 +1988,6 @@ $navGroups = [
             {{-- Active Internal Referrals --}}
             @if($this->internalReferrals->isNotEmpty())
                 <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden" x-data="{ open: true }">
-                    <div class="h-0.5 bg-gradient-to-r from-amber-400 to-amber-600"></div>
                     <button @click="open = !open" class="w-full px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                         <div class="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
                             <x-filament::icon icon="heroicon-m-arrow-path-rounded-square" class="w-3.5 h-3.5 text-amber-500"/>
@@ -1857,7 +1996,7 @@ $navGroups = [
                         <x-filament::icon icon="heroicon-m-chevron-down" class="w-4 h-4 text-gray-400 transition-transform duration-200" ::class="open ? 'rotate-180' : ''"/>
                     </button>
                     <div x-show="open" x-collapse>
-                        <div class="p-5 space-y-2">
+                        <div class="p-6 space-y-2">
                             @foreach($this->internalReferrals->where('status', 'pending') as $ref)
                                 <div class="flex items-center justify-between p-3.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 text-sm">
                                     <div class="flex items-center gap-2">
@@ -1877,14 +2016,13 @@ $navGroups = [
         {{-- Team roster sidebar --}}
         <div class="space-y-5">
             <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-                <div class="h-0.5 bg-gradient-to-r from-purple-400 to-purple-600"></div>
                 <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center flex-shrink-0">
                         <x-filament::icon icon="heroicon-m-user-group" class="w-3.5 h-3.5 text-purple-500"/>
                     </div>
                     <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Care Team</h3>
                 </div>
-                <div class="p-5 space-y-3">
+                <div class="p-6 space-y-3">
                     @if($activeVisit?->triage?->user)
                         <div class="flex items-center gap-3">
                             <div class="w-9 h-9 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center flex-shrink-0">
@@ -1920,14 +2058,13 @@ $navGroups = [
 
             {{-- Clinical Flags --}}
             <div class="rounded-2xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] overflow-hidden">
-                <div class="h-0.5 bg-gradient-to-r from-red-400 to-red-600"></div>
                 <div class="px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
                         <x-filament::icon icon="heroicon-m-flag" class="w-3.5 h-3.5 text-red-500"/>
                     </div>
                     <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Clinical Flags</h3>
                 </div>
-                <div class="p-5 space-y-2">
+                <div class="p-6 space-y-2">
                     @if($this->allergies->isNotEmpty())
                         <div class="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-sm">
                             <x-filament::icon icon="heroicon-m-exclamation-triangle" class="w-4 h-4 text-red-500 flex-shrink-0"/>
@@ -1955,6 +2092,7 @@ $navGroups = [
     </div>
 @endif
 
+    </div>{{-- end kph-tab-panel --}}
     </div>{{-- end tab content column --}}
 
 </div>{{-- end sidebar + content flex --}}

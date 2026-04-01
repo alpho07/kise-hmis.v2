@@ -1,0 +1,165 @@
+<h2>Card Style Direction</h2>
+<p class="subtitle">3 approaches for the details/content area. The current design has a faint ring border and inconsistent padding — pick the direction that fits KISE best.</p>
+
+<style>
+  .preview-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; margin: 18px 0; }
+  .preview-wrap { border-radius: 10px; overflow: hidden; background: #f3f4f6; padding: 16px; }
+  .preview-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #6b7280; margin-bottom: 12px; }
+
+  /* ── Option A: Borderless Elevated ── */
+  .card-a { background:#fff; border-radius:14px; box-shadow:0 4px 20px rgba(15,23,42,.10); overflow:hidden; margin-bottom:12px; }
+  .card-a-hdr { display:flex; align-items:center; gap:10px; padding:14px 20px; border-bottom:1px solid #f1f5f9; }
+  .card-a-icon { width:30px;height:30px;border-radius:8px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .card-a-title { font-size:13px;font-weight:700;color:#1e293b; }
+  .card-a-body { padding:16px 20px; }
+  .card-a-row { display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f8fafc; }
+  .card-a-row:last-child { border-bottom:none; }
+  .card-a-lbl { font-size:12px;color:#64748b; }
+  .card-a-val { font-size:12px;font-weight:600;color:#1e293b;text-align:right; }
+
+  /* ── Option B: Bordered with green accent ── */
+  .card-b { background:#fff; border-radius:14px; border:1.5px solid #e2e8f0; overflow:hidden; margin-bottom:12px; }
+  .card-b-hdr { display:flex; align-items:center; gap:10px; padding:13px 20px; background:#fff; border-bottom:2px solid #29972E; }
+  .card-b-icon { width:28px;height:28px;border-radius:7px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .card-b-title { font-size:13px;font-weight:700;color:#282F3B; }
+  .card-b-body { padding:14px 20px; }
+  .card-b-row { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9; }
+  .card-b-row:last-child { border-bottom:none; }
+  .card-b-lbl { font-size:12px;color:#6b7280; }
+  .card-b-val { font-size:12px;font-weight:600;color:#282F3B;text-align:right; }
+
+  /* ── Option C: Dark header cards ── */
+  .card-c { background:#fff; border-radius:14px; border:1px solid #e5e7eb; overflow:hidden; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .card-c-hdr { display:flex;align-items:center;gap:10px;padding:13px 20px;background:#282F3B; }
+  .card-c-icon { width:28px;height:28px;border-radius:7px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .card-c-title { font-size:12px;font-weight:700;color:#fff;letter-spacing:.03em;text-transform:uppercase; }
+  .card-c-body { padding:14px 20px; }
+  .card-c-row { display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f3f4f6; }
+  .card-c-row:last-child { border-bottom:none; }
+  .card-c-lbl { font-size:12px;color:#6b7280; }
+  .card-c-val { font-size:12px;font-weight:600;color:#1e293b;text-align:right; }
+
+  /* icons (emoji stand-in) */
+  .ico { font-size:13px; }
+</style>
+
+<div class="preview-row">
+
+  <!-- OPTION A -->
+  <div>
+    <div class="preview-label">A — Soft Elevated (no border, deep shadow)</div>
+    <div class="preview-wrap">
+      <div class="card-a">
+        <div class="card-a-hdr">
+          <div class="card-a-icon"><span class="ico">🪪</span></div>
+          <span class="card-a-title">Personal Information</span>
+        </div>
+        <div class="card-a-body">
+          <div class="card-a-row"><span class="card-a-lbl">UCI</span><span class="card-a-val">KISE/A/000016/2026</span></div>
+          <div class="card-a-row"><span class="card-a-lbl">Full Name</span><span class="card-a-val">Jalima M Kadira</span></div>
+          <div class="card-a-row"><span class="card-a-lbl">Date of Birth</span><span class="card-a-val">Mar 14, 2015</span></div>
+          <div class="card-a-row"><span class="card-a-lbl">Gender</span><span class="card-a-val">Male</span></div>
+          <div class="card-a-row"><span class="card-a-lbl">National ID</span><span class="card-a-val">27890088982</span></div>
+        </div>
+      </div>
+      <div class="card-a">
+        <div class="card-a-hdr">
+          <div class="card-a-icon"><span class="ico">📞</span></div>
+          <span class="card-a-title">Contact Information</span>
+        </div>
+        <div class="card-a-body">
+          <div class="card-a-row"><span class="card-a-lbl">Primary Phone</span><span class="card-a-val">0987778787</span></div>
+          <div class="card-a-row"><span class="card-a-lbl">Guardian Name</span><span class="card-a-val">Jonima</span></div>
+          <div class="card-a-row"><span class="card-a-lbl">Guardian Phone</span><span class="card-a-val">0718278263</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div>
+    <div class="preview-label">B — Bordered + green underline header</div>
+    <div class="preview-wrap">
+      <div class="card-b">
+        <div class="card-b-hdr">
+          <div class="card-b-icon"><span class="ico">🪪</span></div>
+          <span class="card-b-title">Personal Information</span>
+        </div>
+        <div class="card-b-body">
+          <div class="card-b-row"><span class="card-b-lbl">UCI</span><span class="card-b-val">KISE/A/000016/2026</span></div>
+          <div class="card-b-row"><span class="card-b-lbl">Full Name</span><span class="card-b-val">Jalima M Kadira</span></div>
+          <div class="card-b-row"><span class="card-b-lbl">Date of Birth</span><span class="card-b-val">Mar 14, 2015</span></div>
+          <div class="card-b-row"><span class="card-b-lbl">Gender</span><span class="card-b-val">Male</span></div>
+          <div class="card-b-row"><span class="card-b-lbl">National ID</span><span class="card-b-val">27890088982</span></div>
+        </div>
+      </div>
+      <div class="card-b">
+        <div class="card-b-hdr">
+          <div class="card-b-icon"><span class="ico">📞</span></div>
+          <span class="card-b-title">Contact Information</span>
+        </div>
+        <div class="card-b-body">
+          <div class="card-b-row"><span class="card-b-lbl">Primary Phone</span><span class="card-b-val">0987778787</span></div>
+          <div class="card-b-row"><span class="card-b-lbl">Guardian Name</span><span class="card-b-val">Jonima</span></div>
+          <div class="card-b-row"><span class="card-b-lbl">Guardian Phone</span><span class="card-b-val">0718278263</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div>
+    <div class="preview-label">C — Dark header (KISE brand tone)</div>
+    <div class="preview-wrap">
+      <div class="card-c">
+        <div class="card-c-hdr">
+          <div class="card-c-icon"><span class="ico">🪪</span></div>
+          <span class="card-c-title">Personal Information</span>
+        </div>
+        <div class="card-c-body">
+          <div class="card-c-row"><span class="card-c-lbl">UCI</span><span class="card-c-val">KISE/A/000016/2026</span></div>
+          <div class="card-c-row"><span class="card-c-lbl">Full Name</span><span class="card-c-val">Jalima M Kadira</span></div>
+          <div class="card-c-row"><span class="card-c-lbl">Date of Birth</span><span class="card-c-val">Mar 14, 2015</span></div>
+          <div class="card-c-row"><span class="card-c-lbl">Gender</span><span class="card-c-val">Male</span></div>
+          <div class="card-c-row"><span class="card-c-lbl">National ID</span><span class="card-c-val">27890088982</span></div>
+        </div>
+      </div>
+      <div class="card-c">
+        <div class="card-c-hdr">
+          <div class="card-c-icon"><span class="ico">📞</span></div>
+          <span class="card-c-title">Contact Information</span>
+        </div>
+        <div class="card-c-body">
+          <div class="card-c-row"><span class="card-c-lbl">Primary Phone</span><span class="card-c-val">0987778787</span></div>
+          <div class="card-c-row"><span class="card-c-lbl">Guardian Name</span><span class="card-c-val">Jonima</span></div>
+          <div class="card-c-row"><span class="card-c-lbl">Guardian Phone</span><span class="card-c-val">0718278263</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="options" style="margin-top:8px;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Soft Elevated</h3>
+      <p>No border — floats on shadow. Cleanest, most modern. Header uses subtle tinted icon. Rows separated by barely-visible lines.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Bordered + Green Accent</h3>
+      <p>Solid border card, header underlined in KISE green. Ties into brand color clearly. Feels structured and professional.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Dark Header (KISE tone)</h3>
+      <p>Header uses the same #282F3B dark tone as the profile band. Strong hierarchy, matches the overall app palette. Bold and distinctive.</p>
+    </div>
+  </div>
+</div>

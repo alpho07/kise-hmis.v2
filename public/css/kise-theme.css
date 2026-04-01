@@ -1,0 +1,537 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   KISE HMIS — Theme System  v2
+   Injected via PanelsRenderHook::HEAD_END — never touches Filament's CSS.
+   Toggle data-kise-theme on <html> to switch:
+     "forest" (default) | "dark-command" | "topbar"
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Token definitions ────────────────────────────────────────────────────── */
+:root,
+html[data-kise-theme="forest"] {
+    --kise-sidebar-bg:          #29972E;
+    --kise-sidebar-text:        #ffffff;
+    --kise-sidebar-text-active: #ffffff;
+    --kise-sidebar-active-bg:   #000000;
+    --kise-sidebar-hover-bg:    rgba(0, 0, 0, 0.18);
+    --kise-sidebar-group-label: #ffffff;
+    --kise-sidebar-border:      rgba(255, 255, 255, 0.12);
+    --kise-sidebar-icon-active: #FFC105;
+
+    --kise-header-bg:           #ffffff;
+    --kise-header-border:       #E4E6E4;
+    --kise-header-text:         #282F3B;
+
+    --kise-page-bg:             #f3f4f6;
+    --kise-card-bg:             #ffffff;
+    --kise-card-border:         #E4E6E4;
+    --kise-card-shadow:         0 1px 3px rgba(0,0,0,.08);
+    --kise-body-text:           #282F3B;
+    --kise-muted-text:          #6b7280;
+    --kise-input-bg:            #ffffff;
+    --kise-input-border:        #d1d5db;
+    --kise-input-focus:         #29972E;
+    --kise-table-head-bg:       #282F3B;
+    --kise-table-head-text:     #ffffff;
+    --kise-table-row-hover:     #f0fdf4;
+    --kise-table-stripe:        #fafafa;
+    --kise-table-border:        #E4E6E4;
+    --kise-accent:              #FFC105;
+    --kise-primary:             #29972E;
+}
+
+html[data-kise-theme="dark-command"] {
+    --kise-sidebar-bg:          #1a2030;
+    --kise-sidebar-text:        rgba(196, 202, 210, 0.80);
+    --kise-sidebar-text-active: #ffffff;
+    --kise-sidebar-active-bg:   rgba(41, 151, 46, 0.22);
+    --kise-sidebar-hover-bg:    rgba(255, 255, 255, 0.07);
+    --kise-sidebar-group-label: rgba(196, 202, 210, 0.42);
+    --kise-sidebar-border:      rgba(255, 255, 255, 0.07);
+    --kise-sidebar-icon-active: #FFC105;
+
+    --kise-header-bg:           #1e2533;
+    --kise-header-border:       #2d3748;
+    --kise-header-text:         #e2e8f0;
+
+    --kise-topbar-text:         #e2e8f0;
+    --kise-topbar-muted:        #9ca3af;
+
+    --kise-page-bg:             #111827;
+    --kise-card-bg:             #1e2533;
+    --kise-card-border:         #2d3748;
+    --kise-card-shadow:         0 2px 8px rgba(0,0,0,.35);
+    --kise-body-text:           #e2e8f0;
+    --kise-muted-text:          #9ca3af;
+    --kise-input-bg:            #252f3f;
+    --kise-input-border:        #374151;
+    --kise-input-focus:         #29972E;
+    --kise-table-head-bg:       #0f172a;
+    --kise-table-head-text:     #e2e8f0;
+    --kise-table-row-hover:     #1f2d3d;
+    --kise-table-stripe:        #1a2535;
+    --kise-table-border:        #2d3748;
+    --kise-accent:              #FFC105;
+    --kise-primary:             #29972E;
+}
+
+html[data-kise-theme="topbar"] {
+    --kise-sidebar-bg:          #E4E6E4;
+    --kise-sidebar-text:        rgba(40, 47, 59, 0.68);
+    --kise-sidebar-text-active: #282F3B;
+    --kise-sidebar-active-bg:   #ffffff;
+    --kise-sidebar-hover-bg:    rgba(255, 255, 255, 0.65);
+    --kise-sidebar-group-label: rgba(40, 47, 59, 0.44);
+    --kise-sidebar-border:      rgba(40, 47, 59, 0.10);
+    --kise-sidebar-icon-active: #29972E;
+
+    --kise-header-bg:           #282F3B;
+    --kise-header-border:       #1e2533;
+    --kise-header-text:         #ffffff;
+
+    --kise-topbar-text:         #ffffff;
+    --kise-topbar-muted:        rgba(255, 255, 255, 0.55);
+
+    --kise-page-bg:             #f3f4f6;
+    --kise-card-bg:             #ffffff;
+    --kise-card-border:         #E4E6E4;
+    --kise-card-shadow:         0 1px 3px rgba(0,0,0,.08);
+    --kise-body-text:           #282F3B;
+    --kise-muted-text:          #6b7280;
+    --kise-input-bg:            #ffffff;
+    --kise-input-border:        #d1d5db;
+    --kise-input-focus:         #29972E;
+    --kise-table-head-bg:       #282F3B;
+    --kise-table-head-text:     #ffffff;
+    --kise-table-row-hover:     #f0fdf4;
+    --kise-table-stripe:        #fafafa;
+    --kise-table-border:        #E4E6E4;
+    --kise-accent:              #FFC105;
+    --kise-primary:             #29972E;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SIDEBAR
+   ════════════════════════════════════════════════════════════════════════════ */
+.fi-sidebar,
+.fi-sidebar-nav,
+.fi-sidebar-header {
+    background-color: var(--kise-sidebar-bg) !important;
+}
+
+.fi-sidebar-header {
+    border-bottom-color: var(--kise-sidebar-border) !important;
+}
+
+.fi-logo {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+}
+
+html[data-kise-theme="topbar"] .fi-logo {
+    color: var(--kise-sidebar-text-active) !important;
+}
+
+/* Nav items */
+.fi-sidebar-item-button,
+.fi-sidebar-item-button span,
+.fi-sidebar-item-button .fi-sidebar-item-label,
+.fi-sidebar-nav-item span,
+.fi-sidebar-item span {
+    color: var(--kise-sidebar-text) !important;
+}
+.fi-sidebar-item-button {
+    position: relative;
+}
+
+.fi-sidebar-item-button:hover {
+    background-color: var(--kise-sidebar-hover-bg) !important;
+    color: var(--kise-sidebar-text-active) !important;
+}
+
+.fi-sidebar-item-active .fi-sidebar-item-button,
+.fi-sidebar-item-button[aria-current="page"] {
+    background-color: var(--kise-sidebar-active-bg) !important;
+    color: var(--kise-sidebar-text-active) !important;
+    font-weight: 600;
+}
+
+/* Yellow left accent bar */
+.fi-sidebar-item-active .fi-sidebar-item-button::before,
+.fi-sidebar-item-button[aria-current="page"]::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 15%;
+    height: 70%;
+    width: 3px;
+    background-color: var(--kise-sidebar-icon-active);
+    border-radius: 0 3px 3px 0;
+}
+
+/* Icons */
+.fi-sidebar-item-button svg {
+    color: var(--kise-sidebar-text) !important;
+}
+.fi-sidebar-item-active .fi-sidebar-item-button svg,
+.fi-sidebar-item-button[aria-current="page"] svg {
+    color: var(--kise-sidebar-icon-active) !important;
+}
+
+/* ── Nav item badges ─────────────────────────────────────────────────────── */
+.fi-sidebar-item-badge,
+.fi-sidebar-item-button .fi-badge,
+.fi-sidebar .fi-badge {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border-color: #000000 !important;
+}
+
+/* Group labels */
+.fi-sidebar-group-label {
+    color: var(--kise-sidebar-group-label) !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.07em !important;
+    text-transform: uppercase !important;
+    font-weight: 700 !important;
+}
+
+.fi-sidebar hr,
+.fi-sidebar [class*="border"] {
+    border-color: var(--kise-sidebar-border) !important;
+}
+
+/* Scrollbar */
+.fi-sidebar::-webkit-scrollbar { width: 4px; }
+.fi-sidebar::-webkit-scrollbar-track { background: transparent; }
+.fi-sidebar::-webkit-scrollbar-thumb {
+    background: var(--kise-sidebar-border);
+    border-radius: 2px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TOPBAR / HEADER
+   ════════════════════════════════════════════════════════════════════════════ */
+.fi-topbar {
+    background-color: var(--kise-header-bg) !important;
+    border-bottom: 1px solid var(--kise-header-border) !important;
+}
+
+html[data-kise-theme="topbar"] .fi-topbar,
+html[data-kise-theme="dark-command"] .fi-topbar {
+    background-color: var(--kise-header-bg) !important;
+}
+
+html[data-kise-theme="topbar"] .fi-topbar *,
+html[data-kise-theme="topbar"] .fi-topbar svg {
+    color: var(--kise-header-text) !important;
+}
+
+/* ── Hide global search from topbar ─────────────────────────────────────── */
+.fi-global-search-field,
+.fi-global-search,
+[wire\:model\.live\.debounce\.500ms="search"],
+.fi-topbar-item:has(input[type="search"]) {
+    display: none !important;
+}
+
+html[data-kise-theme="dark-command"] .fi-topbar *,
+html[data-kise-theme="dark-command"] .fi-topbar svg {
+    color: var(--kise-header-text) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MAIN CONTENT AREA — full theming
+   ════════════════════════════════════════════════════════════════════════════ */
+html[data-kise-theme="dark-command"] .fi-main,
+html[data-kise-theme="dark-command"] .fi-body,
+html[data-kise-theme="dark-command"] .fi-page,
+html[data-kise-theme="dark-command"] body {
+    background-color: var(--kise-page-bg) !important;
+    color: var(--kise-body-text) !important;
+}
+
+/* Cards / sections */
+html[data-kise-theme="dark-command"] .fi-section,
+html[data-kise-theme="dark-command"] .fi-card,
+html[data-kise-theme="dark-command"] .fi-wi,
+html[data-kise-theme="dark-command"] [class*="fi-wi-"],
+html[data-kise-theme="dark-command"] .fi-section-content-ctn,
+html[data-kise-theme="dark-command"] .rounded-xl,
+html[data-kise-theme="dark-command"] .fi-fo-field-wrp,
+html[data-kise-theme="dark-command"] .fi-section-header {
+    background-color: var(--kise-card-bg) !important;
+    border-color: var(--kise-card-border) !important;
+    color: var(--kise-body-text) !important;
+}
+
+/* Text */
+html[data-kise-theme="dark-command"] .fi-section-header-heading,
+html[data-kise-theme="dark-command"] .fi-section-content label,
+html[data-kise-theme="dark-command"] .fi-fo-field-wrp-label,
+html[data-kise-theme="dark-command"] p,
+html[data-kise-theme="dark-command"] span:not(.fi-badge *),
+html[data-kise-theme="dark-command"] h1,
+html[data-kise-theme="dark-command"] h2,
+html[data-kise-theme="dark-command"] h3,
+html[data-kise-theme="dark-command"] h4 {
+    color: var(--kise-body-text) !important;
+}
+
+/* Inputs */
+html[data-kise-theme="dark-command"] input,
+html[data-kise-theme="dark-command"] select,
+html[data-kise-theme="dark-command"] textarea,
+html[data-kise-theme="dark-command"] .fi-input,
+html[data-kise-theme="dark-command"] .fi-select-input,
+html[data-kise-theme="dark-command"] [class*="fi-input"] {
+    background-color: var(--kise-input-bg) !important;
+    border-color: var(--kise-input-border) !important;
+    color: var(--kise-body-text) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TABLES (all themes)
+   ════════════════════════════════════════════════════════════════════════════ */
+.fi-ta-header-cell,
+.fi-ta-table thead th {
+    background-color: var(--kise-table-head-bg) !important;
+    color: var(--kise-table-head-text) !important;
+    font-size: 0.68rem !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    font-weight: 600 !important;
+}
+
+.fi-ta-header-cell span,
+.fi-ta-header-cell button,
+.fi-ta-table thead th span,
+.fi-ta-table thead th button {
+    color: var(--kise-table-head-text) !important;
+}
+
+.fi-ta-row:hover td,
+.fi-ta-row:hover .fi-ta-cell,
+.fi-ta-table tbody tr:hover td {
+    background-color: var(--kise-table-row-hover) !important;
+}
+
+.fi-ta-table tbody tr:nth-child(even) td {
+    background-color: var(--kise-table-stripe);
+}
+
+html[data-kise-theme="dark-command"] .fi-ta-table,
+html[data-kise-theme="dark-command"] .fi-ta-cell,
+html[data-kise-theme="dark-command"] td {
+    border-color: var(--kise-table-border) !important;
+    color: var(--kise-body-text) !important;
+    background-color: var(--kise-card-bg) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   BADGES / STATUS PILLS
+   ════════════════════════════════════════════════════════════════════════════ */
+.fi-badge-color-success {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+    border-color: #bbf7d0 !important;
+}
+
+.fi-badge-color-warning {
+    background-color: #fef9c3 !important;
+    color: #713f12 !important;
+    border-color: #fef08a !important;
+}
+
+html[data-kise-theme="dark-command"] .fi-badge-color-success {
+    background-color: rgba(41,151,46,0.18) !important;
+    color: #86efac !important;
+    border-color: rgba(41,151,46,0.30) !important;
+}
+
+html[data-kise-theme="dark-command"] .fi-badge-color-warning {
+    background-color: rgba(255,193,5,0.15) !important;
+    color: #fcd34d !important;
+    border-color: rgba(255,193,5,0.28) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PRIMARY BUTTONS
+   ════════════════════════════════════════════════════════════════════════════ */
+.fi-btn-color-primary {
+    background-color: #29972E !important;
+    border-color: #29972E !important;
+    color: #ffffff !important;
+}
+.fi-btn-color-primary:hover {
+    background-color: #237a28 !important;
+    border-color: #237a28 !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SECTION/CARD HEADERS
+   ════════════════════════════════════════════════════════════════════════════ */
+.fi-section-header-heading {
+    color: #282F3B;
+    font-weight: 700;
+}
+
+html[data-kise-theme="dark-command"] .fi-section-header-heading {
+    color: var(--kise-body-text) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PIPELINE WIDGET
+   ════════════════════════════════════════════════════════════════════════════ */
+.kise-pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+    overflow-x: auto;
+    padding: 0;
+}
+
+.kise-pipeline-stage {
+    flex: 1;
+    min-width: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 8px 12px;
+    position: relative;
+    background: var(--kise-card-bg, #fff);
+    border-top: 3px solid transparent;
+    transition: background .15s;
+    cursor: default;
+}
+
+.kise-pipeline-stage:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 22%;
+    height: 56%;
+    width: 1px;
+    background: var(--kise-card-border, #E4E6E4);
+}
+
+.kise-pipeline-stage.active {
+    border-top-color: #29972E;
+    background: rgba(41,151,46,.05);
+}
+
+.kise-pipeline-stage.warning {
+    border-top-color: #FFC105;
+    background: rgba(255,193,5,.05);
+}
+
+.kise-pipeline-count {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    color: #282F3B;
+}
+
+html[data-kise-theme="dark-command"] .kise-pipeline-count {
+    color: #e2e8f0;
+}
+
+.kise-pipeline-stage.active   .kise-pipeline-count { color: #29972E; }
+.kise-pipeline-stage.warning  .kise-pipeline-count { color: #d97706; }
+
+.kise-pipeline-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kise-muted-text, #6b7280);
+    margin-top: 4px;
+    text-align: center;
+}
+
+.kise-pipeline-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d1d5db;
+    margin-top: 6px;
+}
+
+.kise-pipeline-stage.active  .kise-pipeline-dot { background: #29972E; }
+.kise-pipeline-stage.warning .kise-pipeline-dot { background: #FFC105; }
+
+.kise-pipeline-arrow {
+    color: #d1d5db;
+    font-size: 1rem;
+    margin: 0 2px;
+    align-self: center;
+    flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LOGO / BRAND AREA  — per-theme adjustments
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Forest + Dark: SVG has white mark + black K — no filter needed */
+html[data-kise-theme="forest"] .fi-logo img,
+html[data-kise-theme="forest"] .fi-sidebar-header img,
+html[data-kise-theme="dark-command"] .fi-logo img,
+html[data-kise-theme="dark-command"] .fi-sidebar-header img {
+    filter: none;
+}
+
+/* Topbar: light gray sidebar — invert so white text becomes dark, white mark becomes dark */
+html[data-kise-theme="topbar"] .fi-logo img,
+html[data-kise-theme="topbar"] .fi-sidebar-header img {
+    filter: invert(1);
+}
+
+/* Ensure brand text matches sidebar bg */
+.fi-sidebar-header .fi-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   THEME SWITCHER WIDGET
+   ════════════════════════════════════════════════════════════════════════════ */
+#kise-theme-switcher {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 8px;
+    border-radius: 6px;
+    background: var(--kise-sidebar-hover-bg);
+}
+
+#kise-theme-switcher span {
+    color: var(--kise-sidebar-group-label);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.kise-theme-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+}
+
+.kise-theme-dot:hover { transform: scale(1.25); }
+
+.kise-theme-dot.active {
+    border-color: rgba(255, 255, 255, 0.9) !important;
+    transform: scale(1.15);
+}
+
+html[data-kise-theme="topbar"] .kise-theme-dot.active {
+    border-color: #29972E !important;
+}

@@ -1,0 +1,216 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   KISE HMIS — Theme System
+   CSS custom properties per theme. Toggle data-kise-theme on <html>
+   to switch themes: "forest" (default) | "dark-command" | "topbar"
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+html[data-kise-theme="forest"] {
+    --kise-sidebar-bg:          #29972E;
+    --kise-sidebar-text:        rgba(255, 255, 255, 0.85);
+    --kise-sidebar-text-active: #ffffff;
+    --kise-sidebar-active-bg:   rgba(255, 255, 255, 0.18);
+    --kise-sidebar-hover-bg:    rgba(255, 255, 255, 0.10);
+    --kise-sidebar-group-label: rgba(255, 255, 255, 0.55);
+    --kise-sidebar-border:      rgba(255, 255, 255, 0.12);
+    --kise-sidebar-icon-active: #FFC105;
+    --kise-sidebar-logo-bg:     #ffffff;
+    --kise-sidebar-logo-color:  #29972E;
+    --kise-header-bg:           #ffffff;
+    --kise-header-border:       #E4E6E4;
+    --kise-header-text:         #282F3B;
+}
+
+html[data-kise-theme="dark-command"] {
+    --kise-sidebar-bg:          #282F3B;
+    --kise-sidebar-text:        rgba(228, 230, 228, 0.75);
+    --kise-sidebar-text-active: #ffffff;
+    --kise-sidebar-active-bg:   rgba(41, 151, 46, 0.20);
+    --kise-sidebar-hover-bg:    rgba(255, 255, 255, 0.07);
+    --kise-sidebar-group-label: rgba(228, 230, 228, 0.45);
+    --kise-sidebar-border:      rgba(255, 255, 255, 0.08);
+    --kise-sidebar-icon-active: #FFC105;
+    --kise-sidebar-logo-bg:     #29972E;
+    --kise-sidebar-logo-color:  #ffffff;
+    --kise-header-bg:           #ffffff;
+    --kise-header-border:       #E4E6E4;
+    --kise-header-text:         #282F3B;
+}
+
+html[data-kise-theme="topbar"] {
+    --kise-sidebar-bg:          #E4E6E4;
+    --kise-sidebar-text:        rgba(40, 47, 59, 0.70);
+    --kise-sidebar-text-active: #282F3B;
+    --kise-sidebar-active-bg:   #ffffff;
+    --kise-sidebar-hover-bg:    rgba(255, 255, 255, 0.60);
+    --kise-sidebar-group-label: rgba(40, 47, 59, 0.45);
+    --kise-sidebar-border:      rgba(40, 47, 59, 0.10);
+    --kise-sidebar-icon-active: #29972E;
+    --kise-sidebar-logo-bg:     #29972E;
+    --kise-sidebar-logo-color:  #ffffff;
+    --kise-header-bg:           #282F3B;
+    --kise-header-border:       #282F3B;
+    --kise-header-text:         #ffffff;
+}
+
+/* ── Sidebar background ──────────────────────────────────────────────────── */
+.fi-sidebar,
+.fi-sidebar-nav {
+    background-color: var(--kise-sidebar-bg) !important;
+}
+
+.fi-sidebar-header {
+    background-color: var(--kise-sidebar-bg) !important;
+    border-bottom-color: var(--kise-sidebar-border) !important;
+}
+
+/* ── Navigation items ────────────────────────────────────────────────────── */
+.fi-sidebar-item-button {
+    color: var(--kise-sidebar-text) !important;
+}
+
+.fi-sidebar-item-button:hover {
+    background-color: var(--kise-sidebar-hover-bg) !important;
+    color: var(--kise-sidebar-text-active) !important;
+}
+
+.fi-sidebar-item-active .fi-sidebar-item-button,
+.fi-sidebar-item-button[aria-current="page"] {
+    background-color: var(--kise-sidebar-active-bg) !important;
+    color: var(--kise-sidebar-text-active) !important;
+    font-weight: 600;
+}
+
+/* Active left border accent */
+.fi-sidebar-item-active .fi-sidebar-item-button::before,
+.fi-sidebar-item-button[aria-current="page"]::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    height: 60%;
+    width: 3px;
+    background-color: var(--kise-sidebar-icon-active);
+    border-radius: 0 2px 2px 0;
+}
+.fi-sidebar-item-button {
+    position: relative;
+}
+
+/* Icon colors */
+.fi-sidebar-item-button .fi-sidebar-item-icon {
+    color: var(--kise-sidebar-text) !important;
+}
+.fi-sidebar-item-active .fi-sidebar-item-button .fi-sidebar-item-icon,
+.fi-sidebar-item-button[aria-current="page"] .fi-sidebar-item-icon {
+    color: var(--kise-sidebar-icon-active) !important;
+}
+
+/* ── Group labels ────────────────────────────────────────────────────────── */
+.fi-sidebar-group-label,
+.fi-sidebar-group > .fi-sidebar-group-label {
+    color: var(--kise-sidebar-group-label) !important;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+/* Separator lines inside sidebar */
+.fi-sidebar-group {
+    border-color: var(--kise-sidebar-border) !important;
+}
+
+/* ── Topbar / header ─────────────────────────────────────────────────────── */
+.fi-topbar {
+    background-color: var(--kise-header-bg) !important;
+    border-bottom: 1px solid var(--kise-header-border) !important;
+}
+.fi-topbar .fi-topbar-breadcrumbs,
+.fi-topbar nav {
+    color: var(--kise-header-text) !important;
+}
+
+/* ── Brand / logo area ───────────────────────────────────────────────────── */
+.fi-logo {
+    color: var(--kise-sidebar-text-active) !important;
+    font-weight: 800 !important;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.fi-ta-table thead th {
+    background-color: #282F3B !important;
+    color: #ffffff !important;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.fi-ta-table tbody tr:hover td {
+    background-color: #f0fdf4 !important;
+}
+
+.fi-ta-table tbody tr:nth-child(even) td {
+    background-color: #fafafa;
+}
+
+/* ── Badges / status pills ───────────────────────────────────────────────── */
+.fi-badge-color-success {
+    background-color: #29972E !important;
+    color: #ffffff !important;
+}
+.fi-badge-color-warning {
+    background-color: #FFC105 !important;
+    color: #282F3B !important;
+}
+
+/* ── Primary buttons ─────────────────────────────────────────────────────── */
+.fi-btn-color-primary {
+    background-color: #29972E !important;
+    border-color: #29972E !important;
+    color: #ffffff !important;
+}
+.fi-btn-color-primary:hover {
+    background-color: #237a28 !important;
+    border-color: #237a28 !important;
+}
+
+/* ── Section/card headers ────────────────────────────────────────────────── */
+.fi-section-header-heading {
+    color: #282F3B !important;
+    font-weight: 700;
+}
+
+/* ── Scrollbar in sidebar ────────────────────────────────────────────────── */
+.fi-sidebar::-webkit-scrollbar { width: 4px; }
+.fi-sidebar::-webkit-scrollbar-track { background: transparent; }
+.fi-sidebar::-webkit-scrollbar-thumb { background: var(--kise-sidebar-border); border-radius: 2px; }
+
+/* ── Theme switcher widget (injected via renderHook) ─────────────────────── */
+#kise-theme-switcher {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 8px;
+    border-radius: 6px;
+    background: var(--kise-sidebar-hover-bg);
+}
+#kise-theme-switcher span {
+    color: var(--kise-sidebar-group-label);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.kise-theme-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+}
+.kise-theme-dot:hover { transform: scale(1.2); }
+.kise-theme-dot.active { border-color: var(--kise-sidebar-text-active); }
