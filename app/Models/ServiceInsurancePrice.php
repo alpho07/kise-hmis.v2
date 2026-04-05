@@ -19,8 +19,6 @@ class ServiceInsurancePrice extends Model
         'is_fully_covered',
         'requires_preauthorization',
         'preauthorization_code',
-        'effective_from',
-        'effective_to',
         'is_active',
         'notes',
     ];
@@ -31,8 +29,6 @@ class ServiceInsurancePrice extends Model
         'coverage_percentage' => 'decimal:2',
         'is_fully_covered' => 'boolean',
         'requires_preauthorization' => 'boolean',
-        'effective_from' => 'date',
-        'effective_to' => 'date',
         'is_active' => 'boolean',
     ];
 
@@ -89,19 +85,4 @@ class ServiceInsurancePrice extends Model
         return $query->where('is_active', true);
     }
 
-    /**
-     * Scope for currently effective prices
-     */
-    public function scopeEffective($query)
-    {
-        return $query->where('is_active', true)
-            ->where(function($q) {
-                $q->whereNull('effective_from')
-                    ->orWhere('effective_from', '<=', today());
-            })
-            ->where(function($q) {
-                $q->whereNull('effective_to')
-                    ->orWhere('effective_to', '>=', today());
-            });
-    }
 }

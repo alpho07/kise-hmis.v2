@@ -123,7 +123,7 @@ public function pendingRequests()
     {
         return $this->insurancePrices()
             ->where('insurance_provider_id', $insurance->id)
-            ->effective()
+            ->active()
             ->first();
     }
 
@@ -147,7 +147,7 @@ public function pendingRequests()
 
         return $this->insurancePrices()
             ->where('insurance_provider_id', $insurance->id)
-            ->effective()
+            ->active()
             ->exists();
     }
 
