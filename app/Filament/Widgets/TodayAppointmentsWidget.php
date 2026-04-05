@@ -94,6 +94,7 @@ class TodayAppointmentsWidget extends BaseWidget
                             'triage_path'    => 'returning',
                             'check_in_time'  => now(),
                             'checked_in_by'  => auth()->id(),
+                            'visit_date'     => today(),
                         ]);
 
                         // 2. Move to triage stage

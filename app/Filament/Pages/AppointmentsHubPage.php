@@ -22,6 +22,14 @@ class AppointmentsHubPage extends Page
         return auth()->user()->hasAnyRole(['receptionist', 'admin', 'super_admin']);
     }
 
+    public function mount(): void
+    {
+        abort_unless(
+            auth()->user()->hasAnyRole(['receptionist', 'admin', 'super_admin', 'branch_manager']),
+            403
+        );
+    }
+
     public function getWidgets(): array
     {
         return [

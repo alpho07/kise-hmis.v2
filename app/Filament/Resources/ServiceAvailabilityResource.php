@@ -77,6 +77,10 @@ class ServiceAvailabilityResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
+                    ->mutateFormDataUsing(function (array $data): array {
+                        $data['updated_by'] = auth()->id();
+                        return $data;
+                    })
                     ->after(function (ServiceAvailability $record) {
                         if (!$record->is_available) {
                             static::notifyAffectedClients($record);

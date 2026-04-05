@@ -126,10 +126,10 @@ class AppointmentResource extends Resource
 
                     Forms\Components\Select::make('appointment_type')
                         ->options([
-                            'follow_up'       => 'Follow-Up',
-                            'review'          => 'Review',
-                            'therapy_session' => 'Therapy Session',
-                            'new_assessment'  => 'New Assessment',
+                            'new'       => 'New',
+                            'follow_up' => 'Follow-Up',
+                            'review'    => 'Review',
+                            'emergency' => 'Emergency',
                         ])
                         ->required(),
                 ])

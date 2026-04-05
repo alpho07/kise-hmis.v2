@@ -306,10 +306,21 @@ class SpecialistHub extends Page implements HasActions, HasForms
                     ->label('Next Session Date (optional)'),
             ])
             ->action(function (array $data) {
+                $booking = \App\Models\ServiceBooking::find($data['service_booking_id']);
+
                 \App\Models\ServiceSession::create(array_merge($data, [
                     'provider_id'        => auth()->id(),
                     'service_booking_id' => $data['service_booking_id'],
                     'session_date'       => $data['session_date'],
+                    'visit_id'           => $this->visit?->id,
+                    'client_id'          => $this->client?->id,
+                    'service_id'         => $booking?->service_id,
+                    'department_id'      => $booking?->department_id,
+                    'session_number'     => 'SES-' . date('Ymd') . '-' . str_pad(
+                                               \App\Models\ServiceSession::whereDate('created_at', today())->count() + 1,
+                                               4, '0', STR_PAD_LEFT
+                                           ),
+                    'start_time'         => now()->format('H:i:s'),
                 ]));
 
                 \Filament\Notifications\Notification::make()
