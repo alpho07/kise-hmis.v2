@@ -435,6 +435,7 @@ class DatabaseSeeder extends Seeder
             'billing_officer' => 'Billing Officer',
             'service_provider' => 'Service Provider',
             'queue_manager' => 'Queue Manager',
+            'customer_care' => 'Customer Care',
         ];
 
         foreach ($roles as $name => $description) {
@@ -771,28 +772,13 @@ class DatabaseSeeder extends Seeder
                 'category' => 'Assessment',
                 'is_active' => true,
             ],
-            [
-                'code' => 'AUD-001',
-                'name' => 'Audiological Assessment',
-                'description' => 'Comprehensive hearing assessment',
-                'department_id' => $aud->id,
-                'base_price' => 2500.00,
-                'sha_covered' => true,
-                'sha_price' => 600.00,
-                'ncpwd_covered' => true,
-                'ncpwd_price' => 1250.00,
-                'requires_assessment' => true,
-                'duration_minutes' => 45,
-                'category' => 'Assessment',
-                'is_active' => true,
-            ],
         ];
 
         foreach ($services as $service) {
             Service::create($service);
         }
 
-        $this->command->info('✓ 10 services seeded');
+        $this->command->info('✓ 9 services seeded');
     }
 
     /**
