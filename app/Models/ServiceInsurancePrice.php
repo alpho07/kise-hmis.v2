@@ -69,12 +69,7 @@ class ServiceInsurancePrice extends Model
      */
     public function isEffective(): bool
     {
-        $now = today();
-        
-        $afterStart = !$this->effective_from || $this->effective_from <= $now;
-        $beforeEnd = !$this->effective_to || $this->effective_to >= $now;
-        
-        return $this->is_active && $afterStart && $beforeEnd;
+        return (bool) $this->is_active;
     }
 
     /**

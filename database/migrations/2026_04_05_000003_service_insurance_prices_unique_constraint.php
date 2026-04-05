@@ -13,7 +13,10 @@ return new class extends Migration {
             INNER JOIN service_insurance_prices sip2
             ON sip1.service_id = sip2.service_id
                AND sip1.insurance_provider_id = sip2.insurance_provider_id
-               AND sip1.updated_at < sip2.updated_at
+               AND (
+                   sip1.updated_at < sip2.updated_at
+                   OR (sip1.updated_at = sip2.updated_at AND sip1.id < sip2.id)
+               )
         ");
 
         Schema::table('service_insurance_prices', function (Blueprint $table) {
