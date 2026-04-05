@@ -21,16 +21,24 @@ class ServiceSession extends Model
         'service_id',
         'client_id',
         'provider_id',
+        'department_id',
         'session_date',
         'start_time',
         'end_time',
         'duration_minutes',
-        'session_type',
         'status',
-        'attendance_status',
-        'signed_in_by',
-        'baseline_assessment_data',
-        'intervention_plan',
+        'session_number',
+        'session_goals',
+        'activities_performed',
+        'attendance',
+        'client_response',
+        'observations',
+        'recommendations',
+        'homework_assigned',
+        'cancellation_reason',
+        'progress_status',
+        'next_session_date',
+        'session_sequence',
     ];
 
     protected $casts = [
@@ -38,7 +46,7 @@ class ServiceSession extends Model
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'duration_minutes' => 'integer',
-        'baseline_assessment_data' => 'array',
+        'session_sequence' => 'integer',
     ];
 
     public function signedInBy(): BelongsTo

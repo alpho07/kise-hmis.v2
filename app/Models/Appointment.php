@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\InsuranceProvider;
 
 class Appointment extends Model
 {
@@ -37,6 +38,8 @@ class Appointment extends Model
         'cancelled_at',
         'created_by',
         'checked_in_by',
+        'branch_id',
+        'insurance_provider_id',
     ];
 
     protected $casts = [
@@ -91,6 +94,11 @@ class Appointment extends Model
     public function checkedInBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'checked_in_by');
+    }
+
+    public function insuranceProvider(): BelongsTo
+    {
+        return $this->belongsTo(InsuranceProvider::class);
     }
 
     // Scopes
