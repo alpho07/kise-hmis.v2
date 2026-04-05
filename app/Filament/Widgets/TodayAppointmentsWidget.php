@@ -59,6 +59,15 @@ class TodayAppointmentsWidget extends BaseWidget
                     ]),
             ])
             ->actions([
+                Tables\Actions\Action::make('view_client')
+                    ->label('View Client')
+                    ->icon('heroicon-o-user-circle')
+                    ->color('info')
+                    ->url(fn (\App\Models\Appointment $record) => route('filament.admin.pages.client-profile-hub', [
+                        'clientId' => $record->client_id,
+                    ]))
+                    ->openUrlInNewTab(),
+
                 Tables\Actions\Action::make('check_in')
                     ->label('Check In')
                     ->icon('heroicon-o-arrow-right-circle')

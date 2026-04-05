@@ -184,6 +184,20 @@ class ServiceQueueResource extends Resource
                         default => 'success',
                     })
                     ->sortable(),
+
+                Tables\Columns\IconColumn::make('has_follow_up')
+                    ->label('Follow-Up')
+                    ->state(fn (\App\Models\QueueEntry $record) =>
+                        \App\Models\Appointment::where('client_id', $record->client_id)
+                            ->where('appointment_date', '>=', today())
+                            ->exists()
+                    )
+                    ->boolean()
+                    ->trueIcon('heroicon-o-calendar-days')
+                    ->falseIcon('heroicon-o-minus')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('queue_number', 'asc')
             ->poll('5s')
