@@ -129,6 +129,87 @@ class ServiceResource extends Resource
                 ])
                 ->columns(2),
 
+            Forms\Components\Section::make('Insurance Pricing')
+                ->description('Set how much each insurer covers and what the client pays.')
+                ->schema([
+                    Forms\Components\Repeater::make('insurancePrices')
+                        ->relationship('insurancePrices')
+                        ->schema([
+                            Forms\Components\Select::make('insurance_provider_id')
+                                ->label('Insurance Provider')
+                                ->options(function () {
+                                    return \App\Models\InsuranceProvider::active()->ordered()
+                                        ->get()
+                                        ->groupBy(fn($p) => ucwords(str_replace('_', ' ', $p->type)))
+                                        ->map(fn($group) => $group->pluck('name', 'id'))
+                                        ->toArray();
+                                })
+                                ->required()
+                                ->searchable(),
+
+                            Forms\Components\TextInput::make('covered_amount')
+                                ->label('Insurer Pays (KES)')
+                                ->numeric()
+                                ->required(),
+
+                            Forms\Components\TextInput::make('client_copay')
+                                ->label('Client Pays (KES)')
+                                ->numeric()
+                                ->required(),
+
+                            Forms\Components\Toggle::make('is_active')
+                                ->default(true),
+
+                            Forms\Components\Textarea::make('notes')
+                                ->rows(2)
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(3)
+                        ->addActionLabel('Add Insurance Price')
+                        ->collapsible(),
+                ])
+                ->collapsible(),
+
+            Forms\Components\Section::make('Session Configuration')
+                ->schema([
+                    Forms\Components\Select::make('service_type')
+                        ->options([
+                            'assessment'           => 'Assessment',
+                            'therapy'              => 'Therapy',
+                            'assistive_technology' => 'Assistive Technology',
+                            'consultation'         => 'Consultation',
+                        ])
+                        ->required()
+                        ->default('assessment'),
+
+                    Forms\Components\Toggle::make('requires_sessions')
+                        ->label('Requires Multiple Sessions')
+                        ->live()
+                        ->helperText('Enable for therapy services where a course of sessions is prescribed.'),
+
+                    Forms\Components\TextInput::make('default_session_count')
+                        ->label('Default Session Count')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(100)
+                        ->visible(fn (\Filament\Forms\Get $get) => $get('requires_sessions'))
+                        ->required(fn (\Filament\Forms\Get $get) => $get('requires_sessions')),
+                ])
+                ->columns(3)
+                ->collapsible(),
+
+            Forms\Components\Section::make('Linked Assessment Forms')
+                ->schema([
+                    Forms\Components\Select::make('assessmentForms')
+                        ->label('Forms')
+                        ->multiple()
+                        ->relationship('assessmentForms', 'name')
+                        ->preload()
+                        ->searchable()
+                        ->helperText('Forms that specialists fill out for this service.'),
+                ])
+                ->collapsible(),
+
         ]);
     }
 
