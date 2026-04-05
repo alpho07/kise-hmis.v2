@@ -124,11 +124,19 @@ class InsuranceProvider extends Model
     }
 
     /**
-     * Scope for public/government insurance
+     * Scope for government scheme insurance
      */
-    public function scopePublic($query)
+    public function scopeGovernmentScheme($query)
     {
-        return $query->where('type', 'public');
+        return $query->where('type', 'government_scheme');
+    }
+
+    /**
+     * Scope for eCitizen insurance
+     */
+    public function scopeEcitizen($query)
+    {
+        return $query->where('type', 'ecitizen');
     }
 
     /**
