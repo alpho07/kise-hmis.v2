@@ -56,6 +56,13 @@ class DatabaseSeeder extends Seeder
         $this->seedServices();
         $this->command->info('');
 
+        // PHASE 4b: Insurance Providers & Service Catalog
+        $this->command->info('🏥 PHASE 4b: Seeding Insurance Providers & Service Catalog...');
+        $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        $this->call(InsuranceProviderSeeder::class);
+        $this->call(ServiceCatalogSeeder::class);
+        $this->command->info('');
+
         // PHASE 5: System Settings
         $this->command->info('⚙️  PHASE 5: Seeding System Settings...');
         $this->command->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

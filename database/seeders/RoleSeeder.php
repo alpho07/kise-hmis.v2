@@ -23,6 +23,7 @@ class RoleSeeder extends Seeder
             'cashier' => 'Cashier',
             'service_provider' => 'Service Provider',
             'queue_manager' => 'Queue Manager',
+            'customer_care' => 'Customer Care',
         ];
 
         foreach ($roles as $name => $description) {
