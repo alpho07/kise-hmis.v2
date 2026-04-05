@@ -185,24 +185,22 @@ class CreateTriage extends CreateRecord
             return 'medical_hold';
         }
         
-        // Route by client_type — set at reception sign-in
-        // new / old_new → full intake assessment
-        // returning     → skip intake, go straight to billing
-        $clientType = $visit->client?->client_type ?? 'new';
-
-        if ($clientType === 'returning') {
+        // Appointment check-ins and explicitly-marked returning visits skip intake entirely.
+        // Routing is system-driven — no nurse input required.
+        if ($visit->is_appointment || $visit->triage_path === 'returning') {
             Log::info('Routing to Billing', [
-                'visit_id'    => $visit->id,
-                'reason'      => 'Returning client — skipping intake',
-                'client_type' => $clientType,
+                'visit_id'       => $visit->id,
+                'reason'         => $visit->is_appointment ? 'Appointment check-in' : 'Returning client triage_path',
+                'is_appointment' => $visit->is_appointment,
+                'triage_path'    => $visit->triage_path,
             ]);
             return 'billing';
         }
 
         Log::info('Routing to Intake', [
             'visit_id'    => $visit->id,
-            'reason'      => 'New or Old-New client — requires intake assessment',
-            'client_type' => $clientType,
+            'reason'      => 'New or walk-in client — requires intake assessment',
+            'triage_path' => $visit->triage_path,
         ]);
         return 'intake';
     }
