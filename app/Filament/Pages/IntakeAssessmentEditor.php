@@ -18,6 +18,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Service;
 use App\Models\ServiceBooking;
+use App\Models\ServiceInsurancePrice;
 use Carbon\Carbon;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -1125,14 +1126,8 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'balance_due'     => 0,
             ]);
 
-            $clientRatio = match ($paymentMethod) {
-                'sha'               => 0.20,
-                'ncpwd'             => 0.10,
-                'waiver'            => 0.00,
-                'insurance_private' => 0.30,
-                'combination'       => 0.50,
-                default             => 1.00,
-            };
+            // Find the right price record for this service + insurer
+            $insuranceProviderId = $sr['insurance_provider_id'] ?? null;
 
             $total = $totalCovered = $totalClient = 0.0;
 
@@ -1142,9 +1137,17 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 ->get();
 
             foreach ($bookings as $booking) {
-                $base       = (float) ($booking->service?->base_price ?? 0);
-                $clientPays = round($base * $clientRatio, 2);
-                $covered    = round($base - $clientPays, 2);
+                $base = (float) ($booking->service?->base_price ?? 0);
+
+                $price = ($insuranceProviderId && $booking->service)
+                    ? ServiceInsurancePrice::where('service_id', $booking->service->id)
+                          ->where('insurance_provider_id', $insuranceProviderId)
+                          ->active()
+                          ->first()
+                    : null;
+
+                $clientPays = $price ? (float) $price->client_copay   : $base;
+                $covered    = $price ? (float) $price->covered_amount : 0.0;
 
                 InvoiceItem::create([
                     'invoice_id'              => $invoice->id,
