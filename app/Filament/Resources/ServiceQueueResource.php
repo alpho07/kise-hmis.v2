@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ServiceQueueResource\Pages;
+use App\Models\Appointment;
 use App\Models\QueueEntry;
 use App\Models\ServiceBooking;
 use App\Models\AssessmentFormSchema;
@@ -35,7 +36,6 @@ class ServiceQueueResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereIn('status', ['ready', 'in_service'])
             ->when(
                 auth()->user()->department_id ?? null,
                 fn($q) => $q->where('department_id', auth()->user()->department_id)
@@ -304,6 +304,78 @@ class ServiceQueueResource extends Resource
                             ->title('Service Completed')
                             ->body("Queue #{$record->queue_number} has been completed."
                                 . ($hasPending ? '' : ' Visit marked as completed.'))
+                            ->send();
+                    }),
+
+                // ========================================
+                // 📅 BOOK FOLLOW-UP
+                // ========================================
+                Tables\Actions\Action::make('bookFollowUp')
+                    ->label('Book Follow-Up')
+                    ->icon('heroicon-o-calendar-plus')
+                    ->color('primary')
+                    ->visible(fn (QueueEntry $record) => $record->status === 'completed')
+                    ->slideOver()
+                    ->form([
+                        Forms\Components\Placeholder::make('client_display')
+                            ->label('Client')
+                            ->content(fn (QueueEntry $record) => $record->client?->full_name ?? '—'),
+
+                        Forms\Components\Select::make('service_id')
+                            ->label('Service')
+                            ->options(\App\Models\Service::active()->pluck('name', 'id'))
+                            ->default(fn (QueueEntry $record) => $record->service_id)
+                            ->required(),
+
+                        Forms\Components\Select::make('provider_id')
+                            ->label('Provider')
+                            ->options(\App\Models\User::whereHas('roles', fn ($q) => $q->where('name', 'service_provider'))->pluck('name', 'id'))
+                            ->default(fn () => auth()->id()),
+
+                        Forms\Components\DatePicker::make('appointment_date')
+                            ->label('Date')
+                            ->default(today()->addWeek())
+                            ->required(),
+
+                        Forms\Components\TimePicker::make('appointment_time')
+                            ->label('Time')
+                            ->required()
+                            ->seconds(false),
+
+                        Forms\Components\Textarea::make('notes')
+                            ->rows(2),
+                    ])
+                    ->action(function (QueueEntry $record, array $data) {
+                        $dept = $record->service?->department_id;
+                        $appt = Appointment::create([
+                            'client_id'        => $record->client_id,
+                            'service_id'       => $data['service_id'],
+                            'provider_id'      => $data['provider_id'] ?? null,
+                            'department_id'    => $dept,
+                            'branch_id'        => auth()->user()->branch_id,
+                            'appointment_date' => $data['appointment_date'],
+                            'appointment_time' => $data['appointment_time'],
+                            'appointment_type' => 'follow_up',
+                            'status'           => 'scheduled',
+                            'notes'            => $data['notes'] ?? null,
+                            'created_by'       => auth()->id(),
+                        ]);
+
+                        app(\App\Services\NotificationService::class)->send(
+                            $record->client,
+                            'follow_up_booking',
+                            [
+                                'service' => $appt->service?->name ?? 'service',
+                                'date'    => $appt->appointment_date->format('d M Y'),
+                                'time'    => $appt->appointment_time->format('H:i'),
+                            ],
+                            $appt->id
+                        );
+
+                        Notification::make()
+                            ->success()
+                            ->title('Follow-Up Booked')
+                            ->body("Appointment set for {$appt->appointment_date->format('d M Y')}.")
                             ->send();
                     }),
 
