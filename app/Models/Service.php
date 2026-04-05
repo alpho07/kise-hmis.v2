@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -49,6 +50,9 @@ class Service extends Model
         'category',
         'subcategory',
         'notes',
+        'service_type',
+        'requires_sessions',
+        'default_session_count',
     ];
 
     protected $casts = [
@@ -63,6 +67,8 @@ class Service extends Model
         'duration_minutes' => 'integer',
         'available_from' => 'date',
         'available_until' => 'date',
+        'requires_sessions' => 'boolean',
+        'default_session_count' => 'integer',
     ];
 
     /**
@@ -70,21 +76,21 @@ class Service extends Model
      */
 
     /**
- * Get all service requests for this service
- */
-public function serviceRequests(): HasMany
-{
-    return $this->hasMany(ServiceRequest::class);
-}
+     * Get all service requests for this service
+     */
+    public function serviceRequests(): HasMany
+    {
+        return $this->hasMany(ServiceRequest::class);
+    }
 
-/**
- * Get pending service requests
- */
-public function pendingRequests()
-{
-    return $this->serviceRequests()
-        ->where('status', 'pending_payment');
-}
+    /**
+     * Get pending service requests
+     */
+    public function pendingRequests()
+    {
+        return $this->serviceRequests()
+            ->where('status', 'pending_payment');
+    }
 
     public function department(): BelongsTo
     {
@@ -114,6 +120,14 @@ public function pendingRequests()
     public function insurancePrices(): HasMany
     {
         return $this->hasMany(ServiceInsurancePrice::class);
+    }
+
+    public function assessmentForms(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            AssessmentFormSchema::class,
+            'service_form_schemas'
+        );
     }
 
     /**
@@ -166,17 +180,17 @@ public function pendingRequests()
 
     public function scopeChild($query)
     {
-        return $query->where('category_type', self::CATEGORY_CHILD);
+        return $query->where('category', self::CATEGORY_CHILD);
     }
 
     public function scopeAdult($query)
     {
-        return $query->where('category_type', self::CATEGORY_ADULT);
+        return $query->where('category', self::CATEGORY_ADULT);
     }
 
     public function scopeBoth($query)
     {
-        return $query->where('category_type', self::CATEGORY_BOTH);
+        return $query->where('category', self::CATEGORY_BOTH);
     }
 
     /**
@@ -203,48 +217,11 @@ public function pendingRequests()
                 'code',
                 'base_price',
                 'is_active',
-                'category_type',
+                'category',
+                'service_type',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
-    }
-
-    public function getAssessmentFormsAttribute()
-    {
-        // Use a cached property to avoid multiple queries
-        if (!isset($this->attributes['_assessment_forms_cache'])) {
-            $departmentName = $this->department?->name;
-            $category = $this->category;
-            
-            $this->attributes['_assessment_forms_cache'] = \App\Models\AssessmentFormSchema::query()
-                ->where('is_active', true)
-                ->where(function($query) use ($departmentName, $category) {
-                    // Match by department name (e.g., "Vision", "Audiology")
-                    if ($departmentName) {
-                        $query->where('category', 'like', "%{$departmentName}%");
-                    }
-                    
-                    // Or match by service category
-                    if ($category) {
-                        $query->orWhere('category', 'like', "%{$category}%");
-                    }
-                    
-                    // Or match by service name keywords
-                    if ($this->name) {
-                        $serviceKeywords = explode(' ', $this->name);
-                        foreach ($serviceKeywords as $keyword) {
-                            if (strlen($keyword) > 3) { // Only meaningful words
-                                $query->orWhere('category', 'like', "%{$keyword}%")
-                                      ->orWhere('name', 'like', "%{$keyword}%");
-                            }
-                        }
-                    }
-                })
-                ->orderBy('name')
-                ->get();
-        }
-        
-        return $this->attributes['_assessment_forms_cache'];
     }
 
 }
