@@ -27,8 +27,8 @@ class Triage extends Model
         'temperature',
         'heart_rate',
         'respiratory_rate',
-        'blood_pressure_systolic',
-        'blood_pressure_diastolic',
+        'systolic_bp',
+        'diastolic_bp',
         'oxygen_saturation',
         'weight',
         'height',
@@ -76,8 +76,8 @@ class Triage extends Model
         'oxygen_saturation' => 'integer',
         'heart_rate' => 'integer',
         'respiratory_rate' => 'integer',
-        'blood_pressure_systolic' => 'integer',
-        'blood_pressure_diastolic' => 'integer',
+        'systolic_bp' => 'integer',
+        'diastolic_bp' => 'integer',
         'pain_scale' => 'integer',
         
         // JSON fields
@@ -236,7 +236,7 @@ class Triage extends Model
         }
         
         // Blood Pressure (systolic)
-        if ($this->blood_pressure_systolic > 180 || $this->blood_pressure_systolic < 90) {
+        if ($this->systolic_bp > 180 || $this->systolic_bp < 90) {
             $score += 15;
         }
         

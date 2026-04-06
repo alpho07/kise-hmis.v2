@@ -164,9 +164,7 @@ class EndToEndCashPatientTest extends TestCase
         $visit = $this->makeVisit(['current_stage' => 'triage']);
         $this->actingAs($this->triageNurse);
 
-        // Use forceCreate to bypass $fillable; 'systolic_bp' is the real DB column
-        // (the model's $fillable mistakenly lists 'blood_pressure_systolic').
-        Triage::forceCreate([
+        Triage::create([
             'visit_id'    => $visit->id,
             'client_id'   => $this->client->id,
             'branch_id'   => $this->branch->id,
@@ -201,6 +199,9 @@ class EndToEndCashPatientTest extends TestCase
             'current_stage' => 'triage',
             'check_in_time' => now(),
         ]);
+
+        // Act as triage nurse for stage advancement
+        $this->actingAs($this->triageNurse);
 
         foreach ([$earliest, $middle, $latest] as $v) {
             $v->completeStage();
