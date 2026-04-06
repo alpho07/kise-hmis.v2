@@ -272,91 +272,116 @@ class CashierQueueResource extends Resource
                     ->modalHeading('Hybrid Payment Processing')
                     ->modalWidth('4xl')
                     ->form(function (Visit $record) {
-                        $balance = $record->invoice->total_client_amount - ($record->invoice->amount_paid ?? 0);
+                        $invoice = $record->invoice;
+                        $balance = $invoice->total_client_amount - ($invoice->amount_paid ?? 0);
+
+                        $billingMethodLabel = match($invoice->payment_method ?? '') {
+                            'sha'               => 'SHA Insurance',
+                            'ncpwd'             => 'NCPWD',
+                            'insurance_private' => 'Private Insurance',
+                            'waiver'            => 'Waiver',
+                            'cash'              => 'Cash',
+                            'mpesa'             => 'M-PESA',
+                            default             => ucfirst($invoice->payment_method ?? 'Direct'),
+                        };
+
+                        $isSponsorMethod = in_array($invoice->payment_method ?? '', ['sha', 'ncpwd', 'insurance_private', 'waiver']);
 
                         return [
-                            Forms\Components\Section::make('Payment Summary')
+                            // ── Invoice summary ───────────────────────────────────────────
+                            Forms\Components\Section::make('Invoice Summary')
                                 ->schema([
-                                    Forms\Components\Placeholder::make('total_due')
-                                        ->label('Total Amount Due')
+                                    Forms\Components\Placeholder::make('billing_method')
+                                        ->label('Billing Method')
+                                        ->content($billingMethodLabel),
+
+                                    Forms\Components\Placeholder::make('sponsor_covers')
+                                        ->label('Sponsor Covers')
+                                        ->content(fn() => 'KES ' . number_format($invoice->total_sponsor_amount ?? 0, 2))
+                                        ->visible($isSponsorMethod),
+
+                                    Forms\Components\Placeholder::make('client_owes')
+                                        ->label('Client Owes')
                                         ->content(fn() => 'KES ' . number_format($balance, 2)),
 
                                     Forms\Components\Placeholder::make('already_paid')
                                         ->label('Already Paid')
-                                        ->content(fn() => 'KES ' . number_format($record->invoice->amount_paid ?? 0, 2))
-                                        ->visible(fn() => $record->invoice->amount_paid > 0),
+                                        ->content(fn() => 'KES ' . number_format($invoice->amount_paid ?? 0, 2))
+                                        ->visible(fn() => ($invoice->amount_paid ?? 0) > 0),
                                 ])
-                                ->columns(2),
+                                ->columns(4),
 
-                            Forms\Components\Section::make('Payment Methods')
-                                ->description('Accept multiple payment methods simultaneously')
+                            // ── M-PESA Override (always shown first, pre-filled) ──────────
+                            Forms\Components\Section::make('M-PESA')
+                                ->description($isSponsorMethod
+                                    ? 'Override: client can pay via M-PESA regardless of billing method.'
+                                    : 'Accept M-PESA payment.')
+                                ->schema([
+                                    Forms\Components\Toggle::make('use_mpesa')
+                                        ->label('Pay via M-PESA')
+                                        ->live()
+                                        ->afterStateUpdated(function (Forms\Set $set, $state) use ($balance) {
+                                            if (!$state) {
+                                                $set('mpesa_amount', 0);
+                                                $set('mpesa_transaction_code', null);
+                                            } else {
+                                                $set('mpesa_amount', $balance); // pre-fill full balance
+                                            }
+                                        }),
+
+                                    Forms\Components\TextInput::make('mpesa_amount')
+                                        ->label('Amount (KES)')
+                                        ->numeric()
+                                        ->prefix('KES')
+                                        ->default(0)
+                                        ->live(debounce: 400)
+                                        ->visible(fn(Forms\Get $get) => $get('use_mpesa'))
+                                        ->required(fn(Forms\Get $get) => $get('use_mpesa')),
+
+                                    Forms\Components\TextInput::make('mpesa_transaction_code')
+                                        ->label('M-PESA Code')
+                                        ->placeholder('e.g. RGH8XYZ123')
+                                        ->visible(fn(Forms\Get $get) => $get('use_mpesa'))
+                                        ->required(fn(Forms\Get $get) => $get('use_mpesa')),
+                                ])
+                                ->columns(3),
+
+                            // ── Other payment methods ─────────────────────────────────────
+                            Forms\Components\Section::make('Other Payment Methods')
+                                ->description('Accept multiple methods simultaneously.')
                                 ->schema([
                                     // Cash
-                                    Forms\Components\Grid::make()
+                                    Forms\Components\Grid::make(2)
                                         ->schema([
                                             Forms\Components\Toggle::make('use_cash')
                                                 ->label('Accept Cash')
                                                 ->live()
-                                                ->afterStateUpdated(
-                                                    fn(Forms\Set $set, $state) =>
-                                                    !$state ? $set('cash_amount', 0) : null
-                                                ),
+                                                ->afterStateUpdated(fn(Forms\Set $set, $state) => !$state ? $set('cash_amount', 0) : null),
 
                                             Forms\Components\TextInput::make('cash_amount')
                                                 ->label('Cash Amount')
                                                 ->numeric()
                                                 ->prefix('KES')
                                                 ->default(0)
-                                                ->live(debounce: 500)
+                                                ->live(debounce: 400)
                                                 ->visible(fn(Forms\Get $get) => $get('use_cash'))
                                                 ->required(fn(Forms\Get $get) => $get('use_cash')),
-                                        ])
-                                        ->columns(2),
-
-                                    // M-PESA
-                                    Forms\Components\Grid::make()
-                                        ->schema([
-                                            Forms\Components\Toggle::make('use_mpesa')
-                                                ->label('Accept M-PESA')
-                                                ->live()
-                                                ->afterStateUpdated(
-                                                    fn(Forms\Set $set, $state) =>
-                                                    !$state ? $set('mpesa_amount', 0) : null
-                                                ),
-
-                                            Forms\Components\TextInput::make('mpesa_amount')
-                                                ->label('M-PESA Amount')
-                                                ->numeric()
-                                                ->prefix('KES')
-                                                ->default(0)
-                                                ->live(debounce: 500)
-                                                ->visible(fn(Forms\Get $get) => $get('use_mpesa'))
-                                                ->required(fn(Forms\Get $get) => $get('use_mpesa')),
-
-                                            Forms\Components\TextInput::make('mpesa_code')
-                                                ->label('M-PESA Code')
-                                                ->visible(fn(Forms\Get $get) => $get('use_mpesa'))
-                                                ->required(fn(Forms\Get $get) => $get('use_mpesa')),
-                                        ])
-                                        ->columns(3),
+                                        ]),
 
                                     // Bank Transfer
-                                    Forms\Components\Grid::make()
+                                    Forms\Components\Grid::make(3)
                                         ->schema([
                                             Forms\Components\Toggle::make('use_bank')
                                                 ->label('Accept Bank Transfer')
                                                 ->live()
-                                                ->afterStateUpdated(
-                                                    fn(Forms\Set $set, $state) =>
-                                                    !$state ? $set('bank_amount', 0) : null
-                                                ),
+                                                ->afterStateUpdated(fn(Forms\Set $set, $state) => !$state ? $set('bank_amount', 0) : null),
 
                                             Forms\Components\TextInput::make('bank_amount')
-                                                ->label('Bank Transfer Amount')
+                                                ->label('Bank Amount')
                                                 ->numeric()
                                                 ->prefix('KES')
                                                 ->default(0)
-                                                ->live(debounce: 500)
+                                                ->live(debounce: 400)
                                                 ->visible(fn(Forms\Get $get) => $get('use_bank'))
                                                 ->required(fn(Forms\Get $get) => $get('use_bank')),
 
@@ -364,63 +389,58 @@ class CashierQueueResource extends Resource
                                                 ->label('Bank Reference')
                                                 ->visible(fn(Forms\Get $get) => $get('use_bank'))
                                                 ->required(fn(Forms\Get $get) => $get('use_bank')),
-                                        ])
-                                        ->columns(3),
+                                        ]),
 
                                     // Credit Account
-                                    Forms\Components\Grid::make()
+                                    Forms\Components\Grid::make(2)
                                         ->schema([
                                             Forms\Components\Toggle::make('use_credit')
                                                 ->label('Use Credit Account')
                                                 ->live()
                                                 ->disabled(fn() => !$record->client->creditAccount ||
                                                     $record->client->creditAccount->available_credit <= 0)
-                                                ->afterStateUpdated(
-                                                    fn(Forms\Set $set, $state) =>
-                                                    !$state ? $set('credit_amount', 0) : null
-                                                ),
+                                                ->afterStateUpdated(fn(Forms\Set $set, $state) => !$state ? $set('credit_amount', 0) : null),
 
                                             Forms\Components\TextInput::make('credit_amount')
                                                 ->label('Credit Amount')
                                                 ->numeric()
                                                 ->prefix('KES')
                                                 ->default(0)
-                                                ->live(debounce: 500)
+                                                ->live(debounce: 400)
                                                 ->visible(fn(Forms\Get $get) => $get('use_credit'))
                                                 ->required(fn(Forms\Get $get) => $get('use_credit'))
                                                 ->maxValue(fn() => $record->client->creditAccount?->available_credit ?? 0)
-                                                ->helperText(
-                                                    fn() => $record->client->creditAccount
-                                                        ? 'Available: KES ' . number_format($record->client->creditAccount->available_credit, 2)
-                                                        : 'No credit account available'
-                                                ),
-                                        ])
-                                        ->columns(2),
-                                ]),
+                                                ->helperText(fn() => $record->client->creditAccount
+                                                    ? 'Available: KES ' . number_format($record->client->creditAccount->available_credit, 2)
+                                                    : 'No credit account'),
+                                        ]),
+                                ])
+                                ->collapsed()
+                                ->collapsible(),
 
-                            Forms\Components\Section::make('Payment Calculation')
+                            // ── Live totals ───────────────────────────────────────────────
+                            Forms\Components\Section::make('Payment Total')
                                 ->schema([
-                                    Forms\Components\Placeholder::make('total_payment')
-                                        ->label('Total Payment')
+                                    Forms\Components\Placeholder::make('total_entering')
+                                        ->label('Total Entering')
                                         ->content(function (Forms\Get $get) {
-                                            $total = ($get('cash_amount') ?? 0) +
-                                                ($get('mpesa_amount') ?? 0) +
-                                                ($get('bank_amount') ?? 0) +
-                                                ($get('credit_amount') ?? 0);
+                                            $total = ($get('cash_amount') ?? 0)
+                                                + ($get('mpesa_amount') ?? 0)
+                                                + ($get('bank_amount') ?? 0)
+                                                + ($get('credit_amount') ?? 0);
                                             return 'KES ' . number_format($total, 2);
                                         }),
 
                                     Forms\Components\Placeholder::make('remaining_balance')
-                                        ->label('Remaining Balance')
+                                        ->label('Remaining After Payment')
                                         ->content(function (Forms\Get $get) use ($balance) {
-                                            $totalPayment = ($get('cash_amount') ?? 0) +
-                                                ($get('mpesa_amount') ?? 0) +
-                                                ($get('bank_amount') ?? 0) +
-                                                ($get('credit_amount') ?? 0);
-                                            $remaining = max(0, $balance - $totalPayment);
+                                            $paid = ($get('cash_amount') ?? 0)
+                                                + ($get('mpesa_amount') ?? 0)
+                                                + ($get('bank_amount') ?? 0)
+                                                + ($get('credit_amount') ?? 0);
+                                            $remaining = max(0, $balance - $paid);
                                             return 'KES ' . number_format($remaining, 2);
-                                        })
-                                        ->extraAttributes(['class' => $balance > 0 ? 'text-danger-600' : 'text-success-600']),
+                                        }),
                                 ])
                                 ->columns(2),
                         ];

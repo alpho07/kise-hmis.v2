@@ -22,40 +22,34 @@ class ListIntakeAssessments extends ListRecords
     public function getTabs(): array
     {
         $today = today();
-        
+
+        // Pending count: visits currently in intake stage that have no assessment yet
+        $pendingCount = Visit::where('current_stage', 'intake')
+            ->whereDate('check_in_time', $today)
+            ->doesntHave('intakeAssessment')
+            ->count();
+
         return [
-            'pending' => Tab::make('Pending Intake')
-                ->badge(Visit::where('current_stage', 'intake')
-                    ->whereDate('check_in_time', $today)
-                    ->doesntHave('intakeAssessment')
-                    ->count())
-                ->modifyQueryUsing(fn (Builder $query) => 
-                    $query->doesntHave('intakeAssessment')
+            'all' => Tab::make('All Assessments')
+                ->icon('heroicon-o-queue-list'),
+
+            'today' => Tab::make('Completed Today')
+                ->badge(
+                    \App\Models\IntakeAssessment::whereDate('created_at', $today)->count()
                 )
-                ->icon('heroicon-o-clock')
-                ->badgeColor('warning'),
-            
-            'completed' => Tab::make('Completed Today')
-                ->badge(Visit::where('current_stage', 'intake')
-                    ->orWhere(function ($q) use ($today) {
-                        $q->has('intakeAssessment')
-                          ->whereHas('intakeAssessment', fn ($query) => 
-                              $query->whereDate('created_at', $today)
-                          );
-                    })
-                    ->whereDate('check_in_time', $today)
-                    ->count())
-                ->modifyQueryUsing(fn (Builder $query) => 
-                    $query->has('intakeAssessment')
+                ->modifyQueryUsing(fn (Builder $query) =>
+                    $query->whereDate('created_at', $today)
                 )
                 ->icon('heroicon-o-check-circle')
                 ->badgeColor('success'),
-            
-            'all' => Tab::make('All Today')
-                ->badge(Visit::where('current_stage', 'intake')
-                    ->whereDate('check_in_time', $today)
-                    ->count())
-                ->icon('heroicon-o-queue-list'),
+
+            'pending_info' => Tab::make('Awaiting Intake')
+                ->badge($pendingCount)
+                ->badgeColor('warning')
+                // This tab shows existing assessments — the badge is informational only.
+                // True "pending" visits have no IntakeAssessment record yet, so we show all.
+                ->modifyQueryUsing(fn (Builder $query) => $query)
+                ->icon('heroicon-o-clock'),
         ];
     }
 }

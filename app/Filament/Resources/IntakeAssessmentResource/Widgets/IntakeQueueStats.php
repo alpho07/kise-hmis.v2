@@ -23,8 +23,8 @@ class IntakeQueueStats extends BaseWidget
         $avgTime = IntakeAssessment::whereDate('created_at', $today)
             ->get()
             ->map(function ($intake) {
-                $stage = $intake->visit->stages()
-                    ->where('stage', 'intake')
+                $stage = $intake->visit?->stages()
+                    ?->where('stage', 'intake')
                     ->whereNotNull('completed_at')
                     ->first();
                 
@@ -50,10 +50,9 @@ class IntakeQueueStats extends BaseWidget
             ->where('visit_type', 'initial')
             ->count();
         
-        $totalServicesSelected = IntakeAssessment::whereDate('created_at', $today)
-            ->withCount('visit.serviceBookings')
-            ->get()
-            ->sum('visit_service_bookings_count');
+        $totalServicesSelected = \App\Models\ServiceBooking::whereHas('visit', function ($q) use ($today) {
+            $q->whereHas('intakeAssessment', fn ($q2) => $q2->whereDate('created_at', $today));
+        })->count();
 
         return [
             Stat::make('Pending Intake', $pending)

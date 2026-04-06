@@ -2557,13 +2557,13 @@ class IntakeAssessmentResource extends Resource
                     ->label('Visit #')->searchable()->sortable()->color('primary')->weight('semibold'),
                 Tables\Columns\TextColumn::make('client.full_name')
                     ->label('Client')->searchable()->weight('semibold')
-                    ->description(fn($r) => $r->client?->uci),
+                    ->description(fn($record) => $record->client?->uci),
                 Tables\Columns\TextColumn::make('verification_mode')->label('Type')->badge()
-                    ->formatStateUsing(fn($s) => match($s) { 'new_client' => 'New', 'old_new_client' => 'Old-New', 'returning_client' => 'Returning', default => ucfirst($s ?? '—') })
-                    ->color(fn($s) => match($s) { 'new_client' => 'success', 'old_new_client' => 'warning', 'returning_client' => 'primary', default => 'gray' }),
+                    ->formatStateUsing(fn($state) => match($state) { 'new_client' => 'New', 'old_new_client' => 'Old-New', 'returning_client' => 'Returning', default => ucfirst($state ?? '—') })
+                    ->color(fn($state) => match($state) { 'new_client' => 'success', 'old_new_client' => 'warning', 'returning_client' => 'primary', default => 'gray' }),
                 Tables\Columns\TextColumn::make('priority_level')->label('Priority')->badge()
-                    ->color(fn($s) => match((int)$s) { 1 => 'danger', 2 => 'warning', 3 => 'primary', default => 'gray' })
-                    ->formatStateUsing(fn($s) => match((int)$s) { 1 => 'Urgent', 2 => 'High', 3 => 'Medium', 4 => 'Low', 5 => 'Routine', default => '—' }),
+                    ->color(fn($state) => match((int)$state) { 1 => 'danger', 2 => 'warning', 3 => 'primary', default => 'gray' })
+                    ->formatStateUsing(fn($state) => match((int)$state) { 1 => 'Urgent', 2 => 'High', 3 => 'Medium', 4 => 'Low', 5 => 'Routine', default => '—' }),
                 Tables\Columns\TextColumn::make('created_at')->label('Assessed')->dateTime('d M Y H:i')->sortable(),
             ])
             ->defaultSort('created_at', 'desc')

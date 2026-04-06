@@ -216,6 +216,14 @@ public function hasPendingServiceRequests(): bool
         return $this->hasMany(QueueEntry::class, 'visit_id');
     }
 
+    /**
+     * Get all dynamic assessment form responses for this visit
+     */
+    public function assessmentFormResponses(): HasMany
+    {
+        return $this->hasMany(AssessmentFormResponse::class, 'visit_id');
+    }
+
     // ==========================================
     // REFERRAL RELATIONSHIPS
     // ==========================================

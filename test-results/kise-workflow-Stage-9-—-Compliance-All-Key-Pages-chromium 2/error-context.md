@@ -1,0 +1,330 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: kise-workflow.spec.ts >> Stage 9 — Compliance: All Key Pages
+- Location: tests/e2e/kise-workflow.spec.ts:787:1
+
+# Error details
+
+```
+Error: Server errors detected on: Intake Assessments
+```
+
+```
+Error: apiRequestContext._wrapApiCall: ENOENT: no such file or directory, open '/Users/alphy/Documents/kise-hmis.v2/test-results/.playwright-artifacts-2/traces/496d41c02016cf336985-8226aa4785e0748c28e8-recording5.trace'
+```
+
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - navigation [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]:
+            - generic [ref=e8]:
+              - paragraph [ref=e9]: Super Admin
+              - paragraph [ref=e10]:
+                - generic [ref=e11]: Super Admin
+                - generic [ref=e12]: ·
+                - generic [ref=e13]: 2m 47s
+            - generic [ref=e15]:
+              - generic "Forest Green" [ref=e16] [cursor=pointer]
+              - generic "Dark Command" [ref=e17] [cursor=pointer]
+              - generic "Top Bar" [ref=e18] [cursor=pointer]
+          - button "User menu" [ref=e21] [cursor=pointer]:
+            - img "Avatar of Super Admin" [ref=e22]
+      - main [ref=e23]:
+        - generic [ref=e25]:
+          - generic [ref=e27]:
+            - navigation [ref=e28]:
+              - list [ref=e29]:
+                - listitem [ref=e30]:
+                  - link "Payments" [ref=e31] [cursor=pointer]:
+                    - /url: http://127.0.0.1:8000/admin/payments
+                - listitem [ref=e32]:
+                  - img [ref=e33]
+                  - generic [ref=e35]: List
+            - heading "Payments (0 transactions)" [level=1] [ref=e36]
+            - paragraph [ref=e37]: "Total: KES 51,200.00"
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - generic [ref=e47]: Search
+                  - generic [ref=e48]:
+                    - img [ref=e50]
+                    - searchbox "Search" [ref=e53]
+                - button "Filter 2" [ref=e56] [cursor=pointer]:
+                  - generic [ref=e57]: Filter
+                  - img [ref=e58]
+                  - generic [ref=e63]: "2"
+                - button "Toggle columns" [ref=e66] [cursor=pointer]:
+                  - generic [ref=e67]: Toggle columns
+                  - img [ref=e68]
+              - generic [ref=e70]:
+                - generic [ref=e71]:
+                  - generic [ref=e72]: Active filters
+                  - generic [ref=e73]:
+                    - generic [ref=e74]:
+                      - generic [ref=e76]: "Status: Completed"
+                      - button "Remove filter" [ref=e77] [cursor=pointer]:
+                        - img [ref=e78]
+                        - generic [ref=e80]: Remove filter
+                    - generic [ref=e81]:
+                      - generic [ref=e83]: Today
+                      - button "Remove filter" [ref=e84] [cursor=pointer]:
+                        - img [ref=e85]
+                        - generic [ref=e87]: Remove filter
+                - button [ref=e89] [cursor=pointer]:
+                  - img [ref=e90]
+              - generic [ref=e94]:
+                - img [ref=e96]
+                - heading "No payments recorded" [level=4] [ref=e98]
+                - paragraph [ref=e99]: Completed payments will appear here
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+            - generic:
+              - dialog
+    - complementary [ref=e100]:
+      - generic [ref=e102]:
+        - link "KISE HMIS" [ref=e104] [cursor=pointer]:
+          - /url: http://127.0.0.1:8000/admin/clients
+          - generic [ref=e106]:
+            - img [ref=e108]
+            - generic [ref=e109]: KISE HMIS
+        - button "Collapse sidebar" [ref=e110] [cursor=pointer]:
+          - generic [ref=e111]: Collapse sidebar
+          - img [ref=e112]
+      - navigation [ref=e114]:
+        - list [ref=e115]:
+          - listitem [ref=e116]:
+            - generic [ref=e117] [cursor=pointer]:
+              - generic [ref=e118]: Client Management
+              - button "Client Management" [expanded] [ref=e119]:
+                - generic [ref=e120]: Client Management
+                - img [ref=e121]
+            - list [ref=e123]:
+              - listitem [ref=e124]:
+                - link "Clients" [ref=e125] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/clients
+                  - img [ref=e126]
+                  - generic [ref=e128]: Clients
+          - listitem [ref=e129]:
+            - generic [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: Clinical Workflow
+              - button "Clinical Workflow" [expanded] [ref=e132]:
+                - generic [ref=e133]: Clinical Workflow
+                - img [ref=e134]
+            - list [ref=e136]:
+              - listitem [ref=e137]:
+                - link "Triage Queue" [ref=e138] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/triage-queues
+                  - img [ref=e139]
+                  - generic [ref=e141]: Triage Queue
+              - listitem [ref=e142]:
+                - link "Intake Queue 3" [ref=e143] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/intake-queues
+                  - img [ref=e144]
+                  - generic [ref=e146]: Intake Queue
+                  - generic [ref=e150]: "3"
+          - listitem [ref=e151]:
+            - generic [ref=e152] [cursor=pointer]:
+              - generic [ref=e153]: Service Delivery
+              - button "Service Delivery" [expanded] [ref=e154]:
+                - generic [ref=e155]: Service Delivery
+                - img [ref=e156]
+            - list [ref=e158]:
+              - listitem [ref=e159]:
+                - link "Service Point Dashboard" [ref=e160] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/service-point-dashboards
+                  - img [ref=e161]
+                  - generic [ref=e163]: Service Point Dashboard
+              - listitem [ref=e164]:
+                - link "Service Queue 5" [ref=e165] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/service-queues
+                  - img [ref=e166]
+                  - generic [ref=e168]: Service Queue
+                  - generic [ref=e172]: "5"
+          - listitem [ref=e173]:
+            - generic [ref=e174] [cursor=pointer]:
+              - generic [ref=e175]: Geo-location Management
+              - button "Geo-location Management" [expanded] [ref=e176]:
+                - generic [ref=e177]: Geo-location Management
+                - img [ref=e178]
+            - list [ref=e180]:
+              - listitem [ref=e181]:
+                - link "Counties" [ref=e182] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/counties
+                  - img [ref=e183]
+                  - generic [ref=e185]: Counties
+              - listitem [ref=e186]:
+                - link "Sub Counties" [ref=e187] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/sub-counties
+                  - img [ref=e188]
+                  - generic [ref=e190]: Sub Counties
+              - listitem [ref=e191]:
+                - link "Wards" [ref=e192] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/wards
+                  - img [ref=e193]
+                  - generic [ref=e195]: Wards
+          - listitem [ref=e196]:
+            - generic [ref=e197] [cursor=pointer]:
+              - generic [ref=e198]: System Setup
+              - button "System Setup" [expanded] [ref=e199]:
+                - generic [ref=e200]: System Setup
+                - img [ref=e201]
+            - list [ref=e203]:
+              - listitem [ref=e204]:
+                - link "Departments" [ref=e205] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/departments
+                  - img [ref=e206]
+                  - generic [ref=e208]: Departments
+              - listitem [ref=e209]:
+                - link "Insurance Providers" [ref=e210] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/insurance-providers
+                  - img [ref=e211]
+                  - generic [ref=e213]: Insurance Providers
+              - listitem [ref=e214]:
+                - link "Services" [ref=e215] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/services
+                  - img [ref=e216]
+                  - generic [ref=e218]: Services
+              - listitem [ref=e219]:
+                - link "Branches 1" [ref=e220] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/branches
+                  - img [ref=e221]
+                  - generic [ref=e223]: Branches
+                  - generic [ref=e227]: "1"
+          - listitem [ref=e228]:
+            - generic [ref=e229] [cursor=pointer]:
+              - generic [ref=e230]: User Management
+              - button "User Management" [expanded] [ref=e231]:
+                - generic [ref=e232]: User Management
+                - img [ref=e233]
+            - list [ref=e235]:
+              - listitem [ref=e236]:
+                - link "Users" [ref=e237] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/users
+                  - img [ref=e238]
+                  - generic [ref=e240]: Users
+          - listitem [ref=e241]:
+            - generic [ref=e242] [cursor=pointer]:
+              - generic [ref=e243]: Filament Shield
+              - button "Filament Shield" [expanded] [ref=e244]:
+                - generic [ref=e245]: Filament Shield
+                - img [ref=e246]
+            - list [ref=e248]:
+              - listitem [ref=e249]:
+                - link "Roles 9" [ref=e250] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/shield/roles
+                  - img [ref=e251]
+                  - generic [ref=e253]: Roles
+                  - generic [ref=e257]: "9"
+          - listitem [ref=e258]:
+            - generic [ref=e259] [cursor=pointer]:
+              - generic [ref=e260]: Financial
+              - button "Financial" [expanded] [ref=e261]:
+                - generic [ref=e262]: Financial
+                - img [ref=e263]
+            - list [ref=e265]:
+              - listitem [ref=e266]:
+                - link "Billing Admin 1" [ref=e267] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/billings
+                  - img [ref=e268]
+                  - generic [ref=e270]: Billing Admin
+                  - generic [ref=e274]: "1"
+              - listitem [ref=e275]:
+                - link "Cashier Queue 1" [ref=e276] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/cashier-queues
+                  - img [ref=e277]
+                  - generic [ref=e279]: Cashier Queue
+                  - generic [ref=e283]: "1"
+              - listitem [ref=e284]:
+                - link "Payments" [ref=e285] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/payments
+                  - img [ref=e286]
+                  - generic [ref=e288]: Payments
+          - listitem [ref=e289]:
+            - generic [ref=e290] [cursor=pointer]:
+              - generic [ref=e291]: Finance
+              - button "Finance" [expanded] [ref=e292]:
+                - generic [ref=e293]: Finance
+                - img [ref=e294]
+            - list [ref=e296]:
+              - listitem [ref=e297]:
+                - link "Insurance Claims" [ref=e298] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/insurance-claims
+                  - img [ref=e299]
+                  - generic [ref=e301]: Insurance Claims
+              - listitem [ref=e302]:
+                - link "Batch Invoices" [ref=e303] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8000/admin/insurance-batch-invoices
+                  - img [ref=e304]
+                  - generic [ref=e306]: Batch Invoices
+  - generic:
+    - status
+  - generic [ref=e307]:
+    - generic [ref=e309]:
+      - generic [ref=e311]:
+        - generic [ref=e312] [cursor=pointer]:
+          - text: 
+          - generic: Request
+        - text: 
+        - generic [ref=e313] [cursor=pointer]:
+          - text: 
+          - generic: Timeline
+        - text: 
+        - generic [ref=e314] [cursor=pointer]:
+          - text: 
+          - generic: Views
+          - generic [ref=e315]: "11"
+        - generic [ref=e316] [cursor=pointer]:
+          - text: 
+          - generic: Queries
+          - generic [ref=e317]: "35"
+        - generic [ref=e318] [cursor=pointer]:
+          - text: 
+          - generic: Models
+          - generic [ref=e319]: "2"
+        - generic [ref=e320] [cursor=pointer]:
+          - text: 
+          - generic: Livewire
+          - generic [ref=e321]: "3"
+        - text: 
+        - generic [ref=e322] [cursor=pointer]:
+          - text: 
+          - generic: Gate
+          - generic [ref=e323]: "78"
+      - generic [ref=e324]:
+        - generic [ref=e326] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e329] [cursor=pointer]:
+          - generic: 
+        - generic [ref=e330] [cursor=pointer]:
+          - generic: 
+          - generic: 526ms
+        - generic [ref=e331]:
+          - generic: 
+          - generic: 6MB
+        - generic [ref=e332]:
+          - generic: 
+          - generic: 12.x
+        - generic [ref=e333] [cursor=pointer]:
+          - generic: 
+          - generic: GET admin/payments
+    - text:                                                                                                                                                                                                                                                                                                                                           
+  - text: 
+```
