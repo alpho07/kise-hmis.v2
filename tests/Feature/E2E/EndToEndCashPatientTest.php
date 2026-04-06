@@ -329,8 +329,6 @@ class EndToEndCashPatientTest extends TestCase
     /** @test */
     public function test_09_payment_gate_controls_service_queue_visibility(): void
     {
-        $this->actingAs($this->serviceProvider);
-
         $paidVisit = $this->makeVisit([
             'current_stage'  => 'queue',
             'payment_status' => 'paid',
@@ -339,6 +337,9 @@ class EndToEndCashPatientTest extends TestCase
             'current_stage'  => 'queue',
             'payment_status' => 'pending',
         ]);
+
+        // Act as service provider when reading the queue
+        $this->actingAs($this->serviceProvider);
 
         // Only paid/partial visits are visible in the service queue (scoped to this branch)
         $visibleIds = Visit::where('current_stage', 'queue')
