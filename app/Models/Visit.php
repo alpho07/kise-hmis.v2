@@ -90,6 +90,15 @@ class Visit extends Model
                 $visit->payment_status = 'pending';
             }
         });
+
+        static::created(function ($visit) {
+            VisitStage::create([
+                'visit_id'   => $visit->id,
+                'stage'      => $visit->current_stage,
+                'started_at' => now(),
+                'status'     => 'in_progress',
+            ]);
+        });
     }
 
     // ==========================================
