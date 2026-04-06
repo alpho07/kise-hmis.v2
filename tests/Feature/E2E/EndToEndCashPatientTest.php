@@ -155,4 +155,90 @@ class EndToEndCashPatientTest extends TestCase
             'stage'    => 'triage',
         ]);
     }
+
+    // ─── Tests 04–06: Triage and Intake ──────────────────────────────────────
+
+    /** @test */
+    public function test_04_triage_nurse_records_vitals(): void
+    {
+        $visit = $this->makeVisit(['current_stage' => 'triage']);
+        $this->actingAs($this->triageNurse);
+
+        // Use forceCreate to bypass $fillable; 'systolic_bp' is the real DB column
+        // (the model's $fillable mistakenly lists 'blood_pressure_systolic').
+        Triage::forceCreate([
+            'visit_id'    => $visit->id,
+            'client_id'   => $this->client->id,
+            'branch_id'   => $this->branch->id,
+            'systolic_bp' => 120,
+            'heart_rate'  => 72,
+            'temperature' => 36.6,
+            'triaged_by'  => $this->triageNurse->id,
+        ]);
+
+        $this->assertDatabaseHas('triages', [
+            'visit_id'    => $visit->id,
+            'systolic_bp' => 120,
+            'heart_rate'  => 72,
+        ]);
+    }
+
+    /** @test */
+    public function test_05_triage_clears_to_intake_in_fifo_order(): void
+    {
+        $this->actingAs($this->triageNurse);
+
+        // Create 3 visits with staggered check_in_time — oldest first
+        $earliest = $this->makeVisit([
+            'current_stage' => 'triage',
+            'check_in_time' => now()->subMinutes(10),
+        ]);
+        $middle = $this->makeVisit([
+            'current_stage' => 'triage',
+            'check_in_time' => now()->subMinutes(5),
+        ]);
+        $latest = $this->makeVisit([
+            'current_stage' => 'triage',
+            'check_in_time' => now(),
+        ]);
+
+        foreach ([$earliest, $middle, $latest] as $v) {
+            $v->completeStage();
+            $v->moveToStage('intake');
+        }
+
+        $this->assertDatabaseHas('visits', ['id' => $earliest->id, 'current_stage' => 'intake']);
+        $this->assertDatabaseHas('visits', ['id' => $middle->id,   'current_stage' => 'intake']);
+        $this->assertDatabaseHas('visits', ['id' => $latest->id,   'current_stage' => 'intake']);
+
+        // FIFO: earliest check_in_time must be first in queue (scoped to this branch)
+        $firstInQueue = Visit::where('current_stage', 'intake')
+            ->where('branch_id', $this->branch->id)
+            ->orderBy('check_in_time')
+            ->first();
+
+        $this->assertEquals($earliest->id, $firstInQueue->id);
+    }
+
+    /** @test */
+    public function test_06_intake_assessment_created(): void
+    {
+        $visit = $this->makeVisit(['current_stage' => 'intake']);
+        $this->actingAs($this->intakeOfficer);
+
+        IntakeAssessment::create([
+            'visit_id'          => $visit->id,
+            'client_id'         => $this->client->id,
+            'branch_id'         => $this->branch->id,
+            'assessed_by'       => $this->intakeOfficer->id,
+            'verification_mode' => 'new_client',
+        ]);
+
+        $this->assertDatabaseHas('intake_assessments', ['visit_id' => $visit->id]);
+        // Creating the assessment must NOT auto-advance the stage
+        $this->assertDatabaseHas('visits', [
+            'id'            => $visit->id,
+            'current_stage' => 'intake',
+        ]);
+    }
 }
