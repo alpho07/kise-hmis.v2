@@ -92,12 +92,14 @@ class Visit extends Model
         });
 
         static::created(function ($visit) {
-            VisitStage::create([
-                'visit_id'   => $visit->id,
-                'stage'      => $visit->current_stage,
-                'started_at' => now(),
-                'status'     => 'in_progress',
-            ]);
+            if (! $visit->stages()->exists()) {
+                VisitStage::create([
+                    'visit_id'   => $visit->id,
+                    'stage'      => $visit->current_stage,
+                    'started_at' => $visit->check_in_time ?? now(),
+                    'status'     => 'in_progress',
+                ]);
+            }
         });
     }
 

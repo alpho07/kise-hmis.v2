@@ -4,7 +4,6 @@ namespace Tests\Feature\E2E;
 
 use App\Models\Branch;
 use App\Models\Client;
-use App\Models\InsuranceProvider;
 use App\Models\IntakeAssessment;
 use App\Models\Invoice;
 use App\Models\Payment;
@@ -12,7 +11,6 @@ use App\Models\Service;
 use App\Models\Triage;
 use App\Models\User;
 use App\Models\Visit;
-use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -30,16 +28,14 @@ class EndToEndCashPatientTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Branch            $branch;
-    private User              $receptionist;
-    private User              $triageNurse;
-    private User              $intakeOfficer;
-    private User              $billingOfficer;
-    private User              $cashier;
-    private User              $serviceProvider;
-    private Client            $client;
-    private InsuranceProvider $shaProvider;
-    private Service           $service;
+    private Branch   $branch;
+    private User     $receptionist;
+    private User     $triageNurse;
+    private User     $intakeOfficer;
+    private User     $cashier;
+    private User     $serviceProvider;
+    private Client   $client;
+    private Service  $service;
 
     protected function setUp(): void
     {
@@ -48,7 +44,7 @@ class EndToEndCashPatientTest extends TestCase
         // Roles
         foreach ([
             'receptionist', 'triage_nurse', 'intake_officer',
-            'billing_officer', 'cashier', 'service_provider', 'admin',
+            'cashier', 'service_provider', 'admin',
         ] as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }
@@ -60,30 +56,19 @@ class EndToEndCashPatientTest extends TestCase
         $this->receptionist    = User::factory()->create(['branch_id' => $this->branch->id, 'is_active' => true]);
         $this->triageNurse     = User::factory()->create(['branch_id' => $this->branch->id, 'is_active' => true]);
         $this->intakeOfficer   = User::factory()->create(['branch_id' => $this->branch->id, 'is_active' => true]);
-        $this->billingOfficer  = User::factory()->create(['branch_id' => $this->branch->id, 'is_active' => true]);
         $this->cashier         = User::factory()->create(['branch_id' => $this->branch->id, 'is_active' => true]);
         $this->serviceProvider = User::factory()->create(['branch_id' => $this->branch->id, 'is_active' => true]);
 
         $this->receptionist->assignRole('receptionist');
         $this->triageNurse->assignRole('triage_nurse');
         $this->intakeOfficer->assignRole('intake_officer');
-        $this->billingOfficer->assignRole('billing_officer');
         $this->cashier->assignRole('cashier');
         $this->serviceProvider->assignRole('service_provider');
 
         // Client — adult (30 years old)
         $this->client = Client::factory()->create([
             'branch_id'     => $this->branch->id,
-            'date_of_birth' => Carbon::now()->subYears(30)->toDateString(),
-        ]);
-
-        // Insurance provider — SHA (used for future scenarios, present in fixture)
-        $this->shaProvider = InsuranceProvider::create([
-            'code'                       => 'SHA',
-            'name'                       => 'Social Health Authority',
-            'type'                       => 'government_scheme',
-            'is_active'                  => true,
-            'default_coverage_percentage' => 80,
+            'date_of_birth' => now()->subYears(30)->toDateString(),
         ]);
 
         // Department (required by Service foreign key)
@@ -111,6 +96,8 @@ class EndToEndCashPatientTest extends TestCase
      */
     private function makeVisit(array $overrides = []): Visit
     {
+        // Side effect: sets authenticated user to receptionist for the BelongsToBranch scope.
+        // Tests that need a different actor must call actingAs() after makeVisit().
         $this->actingAs($this->receptionist);
 
         return Visit::create(array_merge([
