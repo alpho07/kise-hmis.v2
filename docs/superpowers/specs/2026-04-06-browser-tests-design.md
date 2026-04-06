@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-06  
 **Scope:** True browser/UI tests from login to workflow completion  
-**Status:** Approved
+**Status:** Under Review (iteration 3)
 
 ---
 
@@ -37,7 +37,7 @@ This spec defines a two-tier browser test suite that fills those gaps.
 ```
 tests/
 ├── Support/
-│   └── WorkflowFixture.php          # Shared trait: roles, branch, users, service
+│   └── WorkflowFixture.php          # Shared trait: roles, branch, users, service, queue entries
 │
 ├── Feature/
 │   └── UI/
@@ -58,6 +58,8 @@ tests/
 
 `tests/Support/WorkflowFixture.php` — used by both Livewire and Dusk test classes.
 
+> **Role name note:** The canonical billing role name used by `BillingResource::shouldRegisterNavigation()` is `billing_officer`. The `RoleSeeder` inconsistently uses `billing_admin` in some places — this must be resolved before the billing tests are written. All fixture code uses `billing_officer`.
+
 **Provides:**
 
 | Property | Type | Value |
@@ -75,9 +77,24 @@ tests/
 
 **Methods:**
 
-- `seedWorkflowFixture()` — called in `setUp()` of each test class
-- `makeVisitAt(string $stage, array $overrides = []): Visit` — creates a visit at the given stage for the fixture client
-- `makeUserWithPassword(string $role, string $password = 'password'): User` — creates a user with known plaintext password (needed by Dusk login form)
+- `seedWorkflowFixture()` — called in `setUp()` of each test class; seeds roles, branch, users, department, service, client
+- `makeVisitAt(string $stage, array $overrides = []): Visit` — creates a visit at the given stage for the fixture client; authenticates as the appropriate role actor via `actingAs()` to satisfy `BelongsToBranch` scope
+- `makeQueueEntry(Visit $visit, array $overrides = []): QueueEntry` — creates a `QueueEntry` row for a visit (required by `ServiceQueueResource` which queries `QueueEntry`, not `Visit` directly)
+- `makeUserWithPassword(string $role, string $password = 'password'): User` — creates a user with a known plaintext password; used by Dusk only (Livewire tests use `actingAs()` and do not need plaintext credentials)
+
+**Stage name reference** (authoritative values from resource `->where('current_stage', ...)` calls):
+
+| Stage | String value |
+|---|---|
+| Reception | `reception` |
+| Triage | `triage` |
+| Intake | `intake` |
+| Billing | `billing` |
+| Cashier queue | `cashier` |
+| Service | `service` |
+| Completed | `completed` |
+
+> **Stage mismatch — production bug to fix before tests:** `CashierQueueResource` correctly filters on `current_stage = 'cashier'`, but both intake completion paths in the live code call `moveToStage('queue')` — `IntakeAssessmentEditor.php:1195` and `CreateIntakeAssessment.php:840`. This means visits completed through intake never appear in the cashier queue. The implementation plan must fix these two lines to use `'cashier'` before cashier-stage tests can pass. The spec uses `'cashier'` throughout as the authoritative target value.
 
 ---
 
@@ -90,6 +107,8 @@ Each test file covers **three concerns** for its workflow stage:
 1. **Form submission** — fill form fields, call save/create, assert DB state
 2. **Stage-advancing action** — call the named Filament table action, assert `current_stage` advances
 3. **Role gate** — wrong role gets HTTP 403 accessing the page
+
+For Livewire tests, role switching is done via `actingAs($user)` before each `Livewire::test()` call. Passwords are irrelevant.
 
 ### 5.2 Per-file specification
 
@@ -110,31 +129,33 @@ Each test file covers **three concerns** for its workflow stage:
 #### `IntakeQueueResourceTest.php`
 - Actor: `intake_officer`
 - Page: `ListIntakeQueues`
-- **Action test:** `start_intake` on visit at `intake` → redirects to intake assessment form
-- **Stage test:** Completing intake (cash path) → `current_stage=queue` (not `billing`)
+- **Action test:** `start_intake` on visit at `intake` stage — this action creates an `IntakeAssessment` record and returns a redirect. Because `Livewire::test()` does not follow redirects, the assertion must be: (a) `assertDatabaseHas('intake_assessments', ['visit_id' => $visit->id])` confirming the record was created, and (b) assert that the Livewire response has a redirect component (via `->assertRedirect()` or checking the dispatch). Do NOT assert page content after the action.
+- **Stage test:** Completing intake (cash path) → `current_stage=cashier` (not `billing`)
 - **Stage test:** Completing intake (SHA path) → `current_stage=billing`
 - **Role gate:** `cashier` accessing intake queue → 403
 
 #### `BillingResourceTest.php`
-- Actor: `billing_officer`
-- Page: `BillingResource` (SHA invoices only)
+- Actor: `billing_officer` (canonical role name — see role name note in §4)
+- Page: `BillingResource` (SHA invoices only — `has_sponsor=true`)
 - **Form test:** Create invoice with `total_sponsor_amount=800`, `total_client_amount=200`, `has_sponsor=true`
-- **Action test:** Approve invoice → visit moves to `queue`
+- **Action test:** `approve` action (action name: `'approve'`) → visit moves to `cashier` stage
 - **Visibility test:** Only `has_sponsor=true` invoices appear in this resource
 - **Role gate:** `cashier` accessing billing → 403
 
 #### `CashierQueueResourceTest.php`
 - Actor: `cashier`
 - Page: `ListCashierQueues`
-- **Action test:** `process_payment` on visit at `queue` → `Payment` record created, `payment_status=paid`
+- **Prerequisite:** Seed visit at `current_stage=cashier`
+- **Action test:** `process_payment` on visit at `cashier` stage → `HybridPaymentService::processHybridPayment()` is called; assert `assertDatabaseHas('visits', ['id' => $visit->id, 'payment_status' => 'paid'])` (the action directly sets this at line 461 of `CashierQueueResource.php`) and `assertDatabaseHas('payments', ['visit_id' => $visit->id])`
 - **Gate test:** Visit with `payment_status=pending` is not visible in service queue after payment
 - **Role gate:** `intake_officer` accessing cashier queue → 403
 
 #### `ServiceQueueResourceTest.php`
 - Actor: `service_provider`
 - Page: `ListServiceQueues`
-- **Visibility test:** Only visits with `payment_status` in `[paid, partial]` appear
-- **Action test:** `complete_service` → visit moves to `completed`, `check_out_time` set
+- **Model note:** `ServiceQueueResource` queries `QueueEntry` (not `Visit` directly). Tests must seed both a `Visit` and a corresponding `QueueEntry` via `makeQueueEntry()`.
+- **Visibility test:** `QueueEntry` whose `visit.payment_status` is in `[paid, partial]` appears; `pending` does not
+- **Action test:** `complete_service` → `QueueEntry.status = 'completed'`, `Visit.current_stage = 'completed'`. Note: `check_out_time` is NOT set by this action — do not assert it. The action calls `$visit->completeStage()` + `$visit->moveToStage('completed')` and sets `QueueEntry.status = 'completed'` and `QueueEntry.service_status = 'completed'`.
 - **Role gate:** `receptionist` accessing service queue → 403
 
 ---
@@ -143,28 +164,28 @@ Each test file covers **three concerns** for its workflow stage:
 
 ### 6.1 Purpose
 
-Prove the full cash patient workflow is navigable in a real browser. One test class, one shared DB state that progresses through all 6 stages.
+Prove the full cash patient workflow is navigable in a real browser. Six independent browser methods, each seeding its own prerequisite DB state, each logging in as the appropriate role.
 
 ### 6.2 Configuration
 
-- **DB:** `.env.dusk.local` uses `DB_DATABASE=database/testing_dusk.sqlite` (file-based, not `:memory:`)
-- **Trait:** `DatabaseMigrations` (runs once, state persists across browser methods)
-- **Chrome:** Uses local Chrome install, headless mode optional
+- **DB:** `.env.dusk.local` uses `DB_DATABASE=database/testing_dusk.sqlite` (file-based, not `:memory:`, so the browser session store works)
+- **State model:** Each Dusk test method is **fully independent** — it seeds its own prerequisite visit state at the required stage, then performs its browser action. This avoids shared mutable state across methods and makes individual failures debuggable. The class uses `use DatabaseMigrations;` which resets the DB before each method (same semantics as `RefreshDatabase`, but runs real migrations rather than wrapping in a transaction).
+- **Chrome:** Uses local Chrome install; headless mode is optional
 
 ### 6.3 Test Methods
 
-| # | Method | Actor | URL | Action | Assert |
-|---|---|---|---|---|---|
-| 01 | `test_01_receptionist_logs_in` | receptionist | `/admin/login` | Fill credentials, submit | Redirected to `/admin`, "Reception" nav visible |
-| 02 | `test_02_register_and_check_in` | receptionist | `/admin/receptions/create` | Fill client form, Save | Success notification, visit in list |
-| 03 | `test_03_triage_vitals` | triage_nurse | `/admin/triage-queues` | `start_triage`, fill vitals, Save | Visit gone from triage queue |
-| 04 | `test_04_intake_assessment` | intake_officer | `/admin/intake-queues` | `start_intake`, fill form, Save | Visit gone from intake queue |
-| 05 | `test_05_cashier_payment` | cashier | `/admin/cashier-queues` | `process_payment`, enter 1000, Confirm | Visit shows `paid` badge |
-| 06 | `test_06_service_completion` | service_provider | `/admin/service-queues` | `complete_service`, confirm | Visit shows `completed`, absent from queue |
+| # | Method | Actor | Prerequisite seeded | URL | Browser action | Assert |
+|---|---|---|---|---|---|---|
+| 01 | `test_01_receptionist_logs_in` | receptionist | user only | `/admin/login` | Fill email+password, submit | Redirected to `/admin`, "Reception" nav visible |
+| 02 | `test_02_register_and_check_in` | receptionist | none | `/admin/receptions/create` | Fill client form, Save | Success notification, visit in list |
+| 03 | `test_03_triage_vitals` | triage_nurse | visit at `triage` | `/admin/triage-queues` | `start_triage`, fill vitals, Save | Visit row disappears from triage queue |
+| 04 | `test_04_intake_assessment` | intake_officer | visit at `intake` | `/admin/intake-queues` | `start_intake`, fill minimal form, Save | Visit row disappears from intake queue |
+| 05 | `test_05_cashier_payment` | cashier | visit at `cashier` | `/admin/cashier-queues` | `process_payment`, enter 1000, Confirm | Visit shows `paid` badge |
+| 06 | `test_06_service_completion` | service_provider | visit at `cashier` with `payment_status=paid` + QueueEntry | `/admin/service-queues` | `complete_service`, confirm | Visit shows `completed`, absent from queue |
 
 ### 6.4 Session management
 
-Each method calls `$this->browse(function (Browser $browser) { ... })`. Between methods the DB persists but browser sessions are fresh — each method logs in as the appropriate role at the start.
+Each method calls `$this->browse(function (Browser $browser) { ... })`. Each method begins with a fresh browser session. Seeding is done in PHP before `$this->browse()` is called. Each method logs in as the appropriate role using `makeUserWithPassword()` credentials.
 
 ---
 
@@ -181,10 +202,13 @@ These are out of scope for this spec.
 
 ## 8. Dependencies / Prerequisites
 
-- `composer require --dev laravel/dusk` — not yet installed
-- `php artisan dusk:install` — scaffolds `tests/Browser/`, `DuskTestCase.php`, `.env.dusk.local`
-- Local Chrome/Chromium must be installed
-- `php artisan dusk:chrome-driver --detect` — installs matching ChromeDriver
+The following must be completed **in order** before tests are written:
+
+1. **Fix intake stage routing bug** — change `moveToStage('queue')` to `moveToStage('cashier')` in `IntakeAssessmentEditor.php:1195` and `CreateIntakeAssessment.php:840`. Without this, visits never reach `CashierQueueResource`.
+2. **Fix RoleSeeder** — update `RoleSeeder.php:22` from `billing_admin` to `billing_officer` (and update the query at line 119). `WorkflowFixture` creates `billing_officer`; if the seeder creates `billing_admin`, tests will use an unpermissioned duplicate role.
+3. **Install Laravel Dusk** — `composer require --dev laravel/dusk`
+4. **Scaffold Dusk** — `php artisan dusk:install` (creates `tests/Browser/`, `DuskTestCase.php`, `.env.dusk.local`)
+5. **Install ChromeDriver** — `php artisan dusk:chrome-driver --detect` (requires local Chrome/Chromium)
 
 ---
 
