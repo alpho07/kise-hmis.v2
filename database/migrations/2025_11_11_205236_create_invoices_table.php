@@ -27,6 +27,7 @@ return new class extends Migration
             $table->decimal('balance_due', 10, 2)->default(0);
             $table->enum('status', ['pending', 'approved', 'paid', 'partial', 'cancelled', 'refunded'])->default('pending');
             $table->string('payment_pathway', 50)->nullable();
+            $table->timestamp('issued_at')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('paid_at')->nullable();

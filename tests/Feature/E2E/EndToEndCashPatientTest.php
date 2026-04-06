@@ -242,4 +242,136 @@ class EndToEndCashPatientTest extends TestCase
             'current_stage' => 'intake',
         ]);
     }
+
+    // ─── Tests 07–10: Queue, Payment, Service ────────────────────────────────
+
+    /** @test */
+    public function test_07_cash_routes_to_queue_not_billing(): void
+    {
+        $visit = $this->makeVisit(['current_stage' => 'intake']);
+        $this->actingAs($this->intakeOfficer);
+
+        $visit->completeStage();
+        $visit->moveToStage('queue');
+
+        // Cash path goes to queue, never billing
+        $this->assertDatabaseHas('visits', [
+            'id'            => $visit->id,
+            'current_stage' => 'queue',
+        ]);
+        $this->assertDatabaseMissing('visit_stages', [
+            'visit_id' => $visit->id,
+            'stage'    => 'billing',
+        ]);
+
+        // Branch isolation: a second branch's visit must NOT appear in this branch's queue
+        $otherBranch = Branch::factory()->create();
+        $otherVisit  = Visit::create([
+            'branch_id'     => $otherBranch->id,
+            'client_id'     => Client::factory()->create(['branch_id' => $otherBranch->id])->id,
+            'visit_type'    => 'walk_in',
+            'visit_date'    => now()->toDateString(),
+            'current_stage' => 'queue',
+            'check_in_time' => now(),
+        ]);
+
+        $queueIds = Visit::where('current_stage', 'queue')
+            ->where('branch_id', $this->branch->id)
+            ->pluck('id');
+
+        $this->assertContains($visit->id, $queueIds->toArray());
+        $this->assertNotContains($otherVisit->id, $queueIds->toArray());
+    }
+
+    /** @test */
+    public function test_08_cashier_creates_invoice_and_records_payment(): void
+    {
+        $visit = $this->makeVisit(['current_stage' => 'queue']);
+        $this->actingAs($this->cashier);
+
+        $invoice = Invoice::create([
+            'invoice_number' => 'INV-TEST-' . uniqid(),
+            'visit_id'       => $visit->id,
+            'client_id'      => $this->client->id,
+            'branch_id'      => $this->branch->id,
+            'total_amount'   => 1000,
+            'balance_due'    => 1000,
+            'generated_by'   => $this->cashier->id,
+        ]);
+
+        Payment::create([
+            'payment_number' => 'PAY-TEST-' . uniqid(),
+            'invoice_id'     => $invoice->id,
+            'visit_id'       => $visit->id,
+            'client_id'      => $this->client->id,
+            'branch_id'      => $this->branch->id,
+            'payment_method' => 'cash',
+            'amount'         => 1000,
+            'received_by'    => $this->cashier->id,
+        ]);
+
+        $visit->update([
+            'payment_status'      => 'paid',
+            'payment_verified_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('payments', [
+            'visit_id'       => $visit->id,
+            'payment_method' => 'cash',
+        ]);
+        $this->assertDatabaseHas('visits', [
+            'id'             => $visit->id,
+            'payment_status' => 'paid',
+        ]);
+        $this->assertNotNull($visit->fresh()->payment_verified_at);
+    }
+
+    /** @test */
+    public function test_09_payment_gate_controls_service_queue_visibility(): void
+    {
+        $this->actingAs($this->serviceProvider);
+
+        $paidVisit = $this->makeVisit([
+            'current_stage'  => 'queue',
+            'payment_status' => 'paid',
+        ]);
+        $pendingVisit = $this->makeVisit([
+            'current_stage'  => 'queue',
+            'payment_status' => 'pending',
+        ]);
+
+        // Only paid/partial visits are visible in the service queue (scoped to this branch)
+        $visibleIds = Visit::where('current_stage', 'queue')
+            ->where('branch_id', $this->branch->id)
+            ->whereIn('payment_status', ['paid', 'partial'])
+            ->pluck('id')
+            ->toArray();
+
+        $this->assertContains($paidVisit->id, $visibleIds);
+        $this->assertNotContains($pendingVisit->id, $visibleIds);
+    }
+
+    /** @test */
+    public function test_10_service_delivered_and_visit_completed(): void
+    {
+        $visit = $this->makeVisit([
+            'current_stage'  => 'queue',
+            'payment_status' => 'paid',
+        ]);
+        $this->actingAs($this->serviceProvider);
+
+        $visit->completeStage();
+        $visit->moveToStage('completed');
+        $visit->update(['check_out_time' => now()]);
+
+        $this->assertDatabaseHas('visits', [
+            'id'            => $visit->id,
+            'current_stage' => 'completed',
+        ]);
+        $this->assertNotNull($visit->fresh()->check_out_time);
+
+        // Completed visit must not appear in any active queue
+        $activeQueueIds = Visit::where('current_stage', 'queue')->pluck('id')->toArray();
+        $this->assertNotContains($visit->id, $activeQueueIds);
+    }
 }

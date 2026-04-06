@@ -17,17 +17,24 @@ class Payment extends Model
     protected $table = 'payments';
 
     protected $fillable = [
+        'payment_number',
         'invoice_id',
         'visit_id',          // ✅ ADDED: Visit relationship
         'client_id',
+        'branch_id',
+        'amount',
         'amount_paid',
         'payment_method',
         'reference_number',
+        'transaction_reference',
         'transaction_id',
         'status',
         'payment_date',
+        'received_by',
+        'received_at',
         'processed_by',
         'notes',
+        'payment_notes',
         
         // M-PESA
         'mpesa_receipt_number',
