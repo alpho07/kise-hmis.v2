@@ -104,11 +104,15 @@ trait WorkflowFixture
      */
     protected function makeQueueEntry(Visit $visit, array $overrides = []): QueueEntry
     {
+        static $queueSeq = 1;
+
         return QueueEntry::create(array_merge([
-            'branch_id'  => $this->branch->id,
-            'visit_id'   => $visit->id,
-            'service_id' => $this->service->id,
-            'status'     => 'waiting',
+            'branch_id'    => $this->branch->id,
+            'visit_id'     => $visit->id,
+            'client_id'    => $visit->client_id,
+            'service_id'   => $this->service->id,
+            'queue_number' => $queueSeq++,
+            'status'       => 'waiting',
         ], $overrides));
     }
 
