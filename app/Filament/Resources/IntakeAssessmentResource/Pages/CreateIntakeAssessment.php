@@ -12,10 +12,12 @@ use App\Models\ClientMedicalHistory;
 use App\Models\ClientSocioDemographic;
 use App\Models\Department;
 use App\Models\FunctionalScreening;
+use App\Models\InsuranceProvider;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Service;
 use App\Models\ServiceBooking;
+use App\Models\ServiceInsurancePrice;
 use App\Models\Visit;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -696,7 +698,22 @@ class CreateIntakeAssessment extends CreateRecord
 
             // ── Create Invoice with sponsor/client split ─────────────────────────
             $paymentMethod = $data['expected_payment_method'] ?? 'cash';
-            $hasSponsor    = in_array($paymentMethod, ['sha', 'ncpwd', 'insurance_private', 'waiver', 'combination'], true);
+            $hasSponsor    = in_array($paymentMethod, ['sha', 'ncpwd', 'insurance', 'insurance_private', 'waiver', 'combination', 'mixed'], true);
+
+            // ── NCPWD age gate (server-side enforcement) ──────────────────────
+            if ($paymentMethod === 'ncpwd') {
+                $clientAge = $client->estimated_age
+                    ?? ($client->date_of_birth ? Carbon::parse($client->date_of_birth)->age : null);
+                if ($clientAge !== null && $clientAge > 17) {
+                    Notification::make()->danger()
+                        ->title('NCPWD Not Applicable')
+                        ->body("NCPWD subsidy is only for clients aged 17 years and below. {$client->full_name} is {$clientAge} years old. Please update the payment method.")
+                        ->persistent()
+                        ->send();
+                    $this->halt();
+                    return;
+                }
+            }
 
             $branchCode    = $visit->branch ? strtoupper(substr($visit->branch->name, 0, 3)) : 'HQ';
             $invYear       = now()->format('Y');
@@ -720,14 +737,27 @@ class CreateIntakeAssessment extends CreateRecord
                 'total_client_amount'   => 0,
             ]);
 
-            // Client co-payment ratio (billing admin adjusts during verification)
-            $clientRatio = match ($paymentMethod) {
-                'sha'               => 0.20, // SHA covers 80%
-                'ncpwd'             => 0.10, // NCPWD covers 90%
-                'waiver'            => 0.00, // Fully waived
-                'insurance_private' => 0.30, // Private insurance covers ~70%
-                'combination'       => 0.50, // Split — admin adjusts
-                default             => 1.00, // Cash/M-PESA: client pays full
+            // ── Resolve insurance provider for dynamic coverage lookup ────────────
+            // For SHA/NCPWD: resolve by provider code. For private insurance: use form's
+            // insurance_provider_id. For waiver/cash/mpesa: no provider.
+            $insuranceProvider = null;
+            if ($hasSponsor) {
+                if (in_array($paymentMethod, ['sha', 'ncpwd'], true)) {
+                    $insuranceProvider = InsuranceProvider::where('code', strtoupper($paymentMethod))
+                        ->where('is_active', true)
+                        ->first();
+                } elseif (!empty($data['insurance_provider_id'])) {
+                    $insuranceProvider = InsuranceProvider::find($data['insurance_provider_id']);
+                }
+            }
+
+            // Fallback coverage ratio when no per-service price record exists
+            $defaultCoverageRatio = match ($paymentMethod) {
+                'waiver' => 1.00, // fully sponsored — client pays nothing
+                'mixed', 'combination' => 0.50, // admin will adjust during billing review
+                default  => $insuranceProvider
+                    ? (float) $insuranceProvider->default_coverage_percentage / 100
+                    : 0.00, // no sponsor coverage
             };
 
             $totalAmount = $totalSponsorAmount = $totalClientAmount = 0.0;
@@ -738,10 +768,37 @@ class CreateIntakeAssessment extends CreateRecord
                 ->get();
 
             foreach ($createdBookings as $booking) {
-                $svc         = $booking->service;
-                $baseCost    = (float) ($svc?->base_price ?? 0);
-                $clientPays  = round($baseCost * $clientRatio, 2);
-                $sponsorPays = round($baseCost - $clientPays, 2);
+                $svc      = $booking->service;
+                $baseCost = (float) ($svc?->base_price ?? 0);
+
+                // Per-service dynamic coverage: look up ServiceInsurancePrice first,
+                // fall back to provider default, then to 0% if no sponsor.
+                if ($hasSponsor && $insuranceProvider && $paymentMethod !== 'waiver') {
+                    $priceRecord = ServiceInsurancePrice::where('service_id', $booking->service_id)
+                        ->where('insurance_provider_id', $insuranceProvider->id)
+                        ->where('is_active', true)
+                        ->first();
+
+                    if ($priceRecord) {
+                        $clientPays     = round((float) $priceRecord->client_copay, 2);
+                        $sponsorPays    = round((float) $priceRecord->covered_amount, 2);
+                        $coveragePct    = round((float) $priceRecord->coverage_percentage, 2);
+                    } else {
+                        // Provider default coverage
+                        $coveragePct    = round($defaultCoverageRatio * 100, 2);
+                        $sponsorPays    = round($baseCost * $defaultCoverageRatio, 2);
+                        $clientPays     = round($baseCost - $sponsorPays, 2);
+                    }
+                } elseif ($paymentMethod === 'waiver') {
+                    $clientPays  = 0.00;
+                    $sponsorPays = round($baseCost, 2);
+                    $coveragePct = 100.00;
+                } else {
+                    // Cash, M-PESA, eCitizen, mixed (admin adjusts) — client pays full
+                    $coveragePct = $hasSponsor ? round($defaultCoverageRatio * 100, 2) : 0.00;
+                    $sponsorPays = round($baseCost * ($coveragePct / 100), 2);
+                    $clientPays  = round($baseCost - $sponsorPays, 2);
+                }
 
                 $item = InvoiceItem::create([
                     'invoice_id'            => $invoice->id,
@@ -752,7 +809,7 @@ class CreateIntakeAssessment extends CreateRecord
                     'unit_price'            => $baseCost,
                     'subtotal'              => $baseCost,
                     'sponsor_type'          => $hasSponsor ? $paymentMethod : null,
-                    'sponsor_percentage'    => $hasSponsor ? round((1 - $clientRatio) * 100, 2) : 0,
+                    'sponsor_percentage'    => $coveragePct,
                     'sponsor_amount'        => $sponsorPays,
                     'client_amount'         => $clientPays,
                     'client_payment_status' => 'pending',
@@ -780,7 +837,7 @@ class CreateIntakeAssessment extends CreateRecord
                 $visit->moveToStage('billing');
                 $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
             } else {
-                $visit->moveToStage('queue');
+                $visit->moveToStage('cashier');
                 $routeLabel = 'Cashier — KES ' . number_format($totalClientAmount, 2) . ' to collect';
             }
 

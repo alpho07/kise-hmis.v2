@@ -1192,7 +1192,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 $visit->moveToStage('billing');
                 $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
             } else {
-                $visit->moveToStage('queue');
+                $visit->moveToStage('cashier');
                 $routeLabel = 'Cashier — KES ' . number_format($totalClient, 2);
             }
 
