@@ -78,6 +78,12 @@ class Payment extends Model
     {
         parent::boot();
 
+        static::creating(function ($payment) {
+            if (empty($payment->payment_number)) {
+                $payment->payment_number = 'PAY-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(6));
+            }
+        });
+
         static::created(function ($payment) {
             // If credit was used, create credit transaction
             if ($payment->account_credit_used > 0 && $payment->credit_account_id) {

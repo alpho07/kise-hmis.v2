@@ -16,13 +16,17 @@ return new class extends Migration
             $table->foreignId('client_id')->constrained()->cascadeOnDelete();
             $table->foreignId('branch_id')->constrained()->cascadeOnDelete();
             $table->enum('payment_method', ['cash', 'mpesa', 'bank_transfer', 'cheque', 'card', 'sha', 'ncpwd', 'nhif', 'other']);
-            $table->decimal('amount', 10, 2);
+            $table->decimal('amount', 10, 2)->default(0);
+            $table->decimal('amount_paid', 10, 2)->default(0); // alias used by HybridPaymentService
             $table->string('transaction_reference', 100)->nullable();
             $table->string('payer_name', 200)->nullable();
             $table->string('payer_phone', 20)->nullable();
             $table->text('payment_notes')->nullable();
+            $table->text('notes')->nullable(); // used by HybridPaymentService
             $table->enum('status', ['pending', 'completed', 'failed', 'refunded'])->default('completed');
-            $table->foreignId('received_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('received_by')->nullable()->constrained('users')->cascadeOnDelete();
+            $table->foreignId('processed_by')->nullable()->constrained('users')->nullOnDelete(); // alias used by HybridPaymentService
+            $table->timestamp('payment_date')->nullable(); // used by HybridPaymentService
             $table->timestamp('received_at')->useCurrent();
             $table->timestamp('refunded_at')->nullable();
             $table->foreignId('refunded_by')->nullable()->constrained('users')->nullOnDelete();
