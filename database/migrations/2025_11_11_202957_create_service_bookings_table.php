@@ -21,7 +21,8 @@ return new class extends Migration
             $table->foreignId('booked_by')->constrained('users')->cascadeOnDelete();
             $table->timestamp('booked_at')->useCurrent();
             $table->timestamps();
-            
+            $table->softDeletes();
+
             $table->index('visit_id');
             $table->index('client_id');
             $table->index('service_id');
