@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('visit_number', 50)->unique();
             $table->date('visit_date');
             $table->enum('visit_type', ['walk_in', 'appointment', 'follow_up', 'emergency'])->default('walk_in');
-            $table->enum('current_stage', ['reception', 'triage', 'intake', 'billing', 'queue', 'service', 'completed', 'deferred'])->default('reception');
+            $table->enum('current_stage', ['reception', 'triage', 'intake', 'billing', 'queue', 'cashier', 'service', 'completed', 'deferred'])->default('reception');
             $table->enum('status', ['open', 'checked_in', 'in_triage', 'in_intake', 'in_progress', 'awaiting_payment', 'in_queue', 'in_service', 'completed', 'deferred', 'cancelled'])->default('open');
             $table->text('chief_complaint')->nullable();
             $table->text('visit_purpose')->nullable();

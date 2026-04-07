@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('visit_stages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('visit_id')->constrained()->cascadeOnDelete();
-            $table->enum('stage', ['reception', 'triage', 'intake', 'billing', 'queue', 'service', 'completed', 'deferred']);
+            $table->enum('stage', ['reception', 'triage', 'intake', 'billing', 'queue', 'cashier', 'service', 'completed', 'deferred']);
             $table->enum('status', ['pending', 'in_progress', 'completed', 'skipped'])->default('pending');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('completed_at')->nullable();
