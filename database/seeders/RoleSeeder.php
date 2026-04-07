@@ -19,7 +19,7 @@ class RoleSeeder extends Seeder
             'receptionist' => 'Receptionist',
             'triage_nurse' => 'Triage Nurse',
             'intake_officer' => 'Intake Officer',
-            'billing_admin' => 'Billing Admin',
+            'billing_officer' => 'Billing Officer',
             'cashier' => 'Cashier',
             'service_provider' => 'Service Provider',
             'queue_manager' => 'Queue Manager',
@@ -116,7 +116,7 @@ class RoleSeeder extends Seeder
             'view_services',
         ]);
 
-        $billingOfficer = Role::where('name', 'billing_admin')->first();
+        $billingOfficer = Role::where('name', 'billing_officer')->first();
         $billingOfficer->givePermissionTo([
             'view_clients',
             'view_visits',
