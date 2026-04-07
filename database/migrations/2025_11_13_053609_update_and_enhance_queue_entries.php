@@ -12,11 +12,11 @@ return new class extends Migration
             //$table->foreignId('service_booking_id')->after('client_id')->constrained()->cascadeOnDelete();
             //$table->foreignId('service_id')->after('service_booking_id')->constrained()->cascadeOnDelete();
             //$table->foreignId('department_id')->after('service_id')->constrained()->cascadeOnDelete();
-            $table->integer('estimated_duration')->nullable()->after('department_id')->comment('Duration in minutes');
+            $table->integer('estimated_duration')->nullable()->comment('Duration in minutes');
             
             //$table->index('service_booking_id');
-            $table->index('service_id');
-            $table->index('department_id');
+            //$table->index('service_id');
+            //$table->index('department_id');
             $table->index(['queue_id', 'status']);
         });
     }

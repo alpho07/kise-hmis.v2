@@ -65,21 +65,31 @@ return new class extends Migration
         });
 */
         // 10. INVOICES TABLE - Change payment_method to support insurance
-        Schema::table('invoices', function (Blueprint $table) {
-            $table->foreignId('insurance_provider_id')->nullable()->after('payment_pathway')->constrained('insurance_providers');
-        });
+        if (!Schema::hasColumn('invoices', 'insurance_provider_id')) {
+            Schema::table('invoices', function (Blueprint $table) {
+                $table->foreignId('insurance_provider_id')->nullable()->after('payment_pathway')->constrained('insurance_providers');
+            });
+        }
 
         // 11. INVOICE ITEMS TABLE - Add insurance details
         Schema::table('invoice_items', function (Blueprint $table) {
-            $table->foreignId('insurance_provider_id')->nullable()->after('department_id')->constrained('insurance_providers');
-            $table->decimal('insurance_covered_amount', 10, 2)->default(0)->after('unit_price');
-            $table->decimal('client_copay_amount', 10, 2)->default(0)->after('insurance_covered_amount');
+            if (!Schema::hasColumn('invoice_items', 'insurance_provider_id')) {
+                $table->foreignId('insurance_provider_id')->nullable()->after('department_id')->constrained('insurance_providers');
+            }
+            if (!Schema::hasColumn('invoice_items', 'insurance_covered_amount')) {
+                $table->decimal('insurance_covered_amount', 10, 2)->default(0)->after('unit_price');
+            }
+            if (!Schema::hasColumn('invoice_items', 'client_copay_amount')) {
+                $table->decimal('client_copay_amount', 10, 2)->default(0)->after('insurance_covered_amount');
+            }
         });
 
         // 12. SERVICE BOOKINGS TABLE - Add insurance
-        Schema::table('service_bookings', function (Blueprint $table) {
-            $table->foreignId('insurance_provider_id')->nullable()->after('assigned_provider_id')->constrained('insurance_providers');
-        });
+        if (!Schema::hasColumn('service_bookings', 'insurance_provider_id')) {
+            Schema::table('service_bookings', function (Blueprint $table) {
+                $table->foreignId('insurance_provider_id')->nullable()->constrained('insurance_providers');
+            });
+        }
     }
 
     public function down(): void

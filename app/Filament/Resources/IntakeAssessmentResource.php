@@ -29,16 +29,22 @@ class IntakeAssessmentResource extends Resource
     protected static ?string $navigationLabel = 'Intake Assessment';
     protected static ?string $navigationGroup = 'Clinical Workflow';
     protected static ?int $navigationSort = 4;
+    public static int $currentVisitId = 0;
 
     public static function shouldRegisterNavigation(): bool { return false; }
 
     // ─── Age Helpers ─────────────────────────────────────────────────────────────
 
-    private static array $_ageCache = [];
+    public static array $_ageCache = [];
+
+    public static function clearAgeCache(): void
+    {
+        self::$_ageCache = [];
+    }
 
     public static function resolveClientAgeMonths(Get $get, ?int $explicitVisitId = null): int
     {
-        $visitId = $explicitVisitId ?? ($get('visit_id') ?: request()->query('visit'));
+        $visitId = $explicitVisitId ?: ($get('visit_id') ?: (self::$currentVisitId ?: request()->query('visit')));
         if (!$visitId) return 9999;
         if (!isset(self::$_ageCache[$visitId])) {
             $dob = Visit::with('client')->find($visitId)?->client?->date_of_birth;
@@ -123,8 +129,14 @@ class IntakeAssessmentResource extends Resource
     }
 
     /**
-     * Build the service options array for Section I selects, filtered by the
-     * clinical categories chosen in i_service_categories (when any are selected).
+     * Build the service options for Section I selects.
+     *
+     * Applies two filters in combination:
+     *  1. Age group — only services appropriate for this client's age are shown
+     *     (age_group = client's group OR age_group = 'all').
+     *  2. Clinical category — when the intake officer has selected one or more
+     *     concern categories the list is narrowed to the relevant departments.
+     *
      * Returns id => "Name — Dept (KES X)" pairs.
      */
     public static function filteredServiceOptions(Get $get): array
@@ -133,6 +145,17 @@ class IntakeAssessmentResource extends Resource
 
         $query = Service::with('department')->where('is_active', true);
 
+        // ── 1. Age-group filter ───────────────────────────────────────────────
+        // Resolve client from the visit bound to this intake form.
+        $visitId = $get('visit_id');
+        if ($visitId) {
+            $client = \App\Models\Visit::find($visitId)?->client;
+            if ($client) {
+                $query->forClient($client);
+            }
+        }
+
+        // ── 2. Clinical category / department filter ──────────────────────────
         if (!empty($selectedCats) && !in_array('other', $selectedCats, true)) {
             $catDeptMap = self::serviceCategoryToDeptNames();
             $deptNames  = [];
@@ -147,7 +170,7 @@ class IntakeAssessmentResource extends Resource
 
         return $query->orderBy('name')
             ->get()
-            ->mapWithKeys(fn($s) =>
+            ->mapWithKeys(fn ($s) =>
                 [$s->id => $s->name
                     . ($s->department ? ' — ' . $s->department->name : '')
                     . ' (KES ' . number_format($s->base_price ?? 0, 0) . ')']
@@ -1691,6 +1714,7 @@ class IntakeAssessmentResource extends Resource
                 ->collapsible()
                 ->collapsed(true)
                 ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) < 19; })
+                ->dehydratedWhenHidden()
                 ->columns(2)
                 ->schema([
                     Forms\Components\Radio::make('imm_epi_card_seen')
@@ -1727,6 +1751,7 @@ class IntakeAssessmentResource extends Resource
                             'td'              => 'Tetanus-Diphtheria (adolescents)',
                         ])
                         ->default([])
+                        ->dehydratedWhenHidden()
                         ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
                             if (!is_array($state)) {
                                 $component->state([]);
@@ -2130,6 +2155,11 @@ class IntakeAssessmentResource extends Resource
         $hasSha   = !empty($client?->sha_number);
         $hasNcpwd = !empty($client?->ncpwd_number);
 
+        // Resolve client age from estimated_age or date_of_birth
+        $clientAge = $client?->estimated_age
+            ?? ($client?->date_of_birth ? \Carbon\Carbon::parse($client->date_of_birth)->age : null);
+        $ncpwdEligible = $clientAge === null || $clientAge <= 17;
+
         return [
             // ── Enrolled schemes ──────────────────────────────────────────────────
             Forms\Components\Placeholder::make('j_scheme_header')
@@ -2178,7 +2208,7 @@ class IntakeAssessmentResource extends Resource
                 ])
                 ->descriptions([
                     'sha'       => 'Covered by SHA enrolment — verify card or number at billing',
-                    'ncpwd'     => 'Subsidised via NCPWD disability card — card must be sighted',
+                    'ncpwd'     => 'Subsidised via NCPWD disability card — for clients aged ≤17 years only',
                     'insurance' => 'Billed to private or employer insurance — provide policy details',
                     'mpesa'     => 'Client pays via M-PESA at cashier — no eligibility documents needed',
                     'cash'      => 'Client pays cash at the cashier window',
@@ -2187,6 +2217,27 @@ class IntakeAssessmentResource extends Resource
                 ])
                 ->live()
                 ->required()
+                ->columnSpanFull(),
+
+            // ── NCPWD age ineligibility warning ──────────────────────────────────
+            Forms\Components\Placeholder::make('j_ncpwd_age_warning')
+                ->hiddenLabel()
+                ->content(function (Get $get) use ($clientAge): HtmlString {
+                    if ($get('expected_payment_method') !== 'ncpwd' || $clientAge === null || $clientAge <= 17) {
+                        return new HtmlString('');
+                    }
+                    return new HtmlString(
+                        '<div style="padding:12px 16px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5;color:#991b1b;">'
+                        . '<strong style="font-size:13px;">⛔ NCPWD Not Applicable for This Client</strong><br>'
+                        . '<span style="font-size:12px;line-height:1.6;">'
+                        . "NCPWD subsidy is a government scheme restricted to clients aged <strong>17 years and below</strong>. "
+                        . "This client is <strong>{$clientAge} years old</strong> and is therefore ineligible. "
+                        . 'Please select a different payment method (SHA, Private Insurance, Cash, or M-PESA).'
+                        . '</span>'
+                        . '</div>'
+                    );
+                })
+                ->visible(fn(Get $get) => $get('expected_payment_method') === 'ncpwd' && !$ncpwdEligible)
                 ->columnSpanFull(),
 
             // ── Eligibility status ────────────────────────────────────────────────
@@ -2386,14 +2437,14 @@ class IntakeAssessmentResource extends Resource
         return $form->schema([
 
             Forms\Components\Hidden::make('visit_id')
-                ->default(fn() => request()->query('visit')),
+                ->default(fn() => self::$currentVisitId ?: request()->query('visit')),
 
             // ══ A — PROFILE CARD ═══════════════════════════════════════════════════
             Forms\Components\Section::make('')->schema([
                 Forms\Components\Placeholder::make('client_info_card')
                     ->hiddenLabel()
                     ->content(function (Get $get): HtmlString {
-                        $visitId = $get('visit_id') ?: request()->query('visit');
+                        $visitId = $get('visit_id') ?: (self::$currentVisitId ?: request()->query('visit'));
                         if (!$visitId) return new HtmlString('<div style="padding:14px;background:#fef3c7;border-radius:8px;color:#92400e;font-weight:600;">⚠ No visit selected.</div>');
                         $visit  = Visit::with(['client', 'triage'])->find($visitId);
                         if (!$visit) return new HtmlString('<div style="padding:14px;background:#fee2e2;border-radius:8px;color:#991b1b;">Visit not found.</div>');
@@ -2474,14 +2525,14 @@ class IntakeAssessmentResource extends Resource
                 ->description('Confirm and update client contact and identification details')
                 ->icon('heroicon-o-identification')
                 ->columns(3)
-                ->schema(self::sectionBSchema((int) request()->query('visit'))),
+                ->schema(self::sectionBSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ C — DISABILITY ══════════════════════════════════════════════════════
             Forms\Components\Section::make('C — Disability & NCPWD Registration')
                 ->icon('heroicon-o-heart')
                 ->collapsible()
                 ->columns(2)
-                ->schema(self::sectionCSchema((int) request()->query('visit'))),
+                ->schema(self::sectionCSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ D — SOCIO-DEMOGRAPHICS ══════════════════════════════════════════════
             Forms\Components\Section::make('D — Socio-Demographic Data')
@@ -2489,10 +2540,10 @@ class IntakeAssessmentResource extends Resource
                 ->collapsible()
                 ->collapsed(true)
                 ->columns(2)
-                ->schema(self::sectionDSchema((int) request()->query('visit'))),
+                ->schema(self::sectionDSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ E — MEDICAL HISTORY & RELATED ═══════════════════════════════════════
-            ...self::sectionESchema((int) request()->query('visit')),
+            ...self::sectionESchema(self::$currentVisitId ?: (int) request()->query('visit')),
 
             // ══ F — EDUCATION & OCCUPATION ══════════════════════════════════════════
             Forms\Components\Section::make('F — Education & Occupation Status')
@@ -2500,27 +2551,27 @@ class IntakeAssessmentResource extends Resource
                 ->collapsible()
                 ->collapsed(true)
                 ->columns(2)
-                ->schema(self::sectionFSchema((int) request()->query('visit'))),
+                ->schema(self::sectionFSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ G — FUNCTIONAL SCREENING (age-band-specific) ════════════════════════
             Forms\Components\Section::make('G — Functional Screening')
                 ->description('Answer Yes / No / Unsure for each item. Referral flags are auto-created on save.')
                 ->icon('heroicon-o-chart-bar')
                 ->collapsible()
-                ->schema(self::sectionGSchema((int) request()->query('visit'))),
+                ->schema(self::sectionGSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ H — REFERRAL & PRESENTING CONCERN ═══════════════════════════════════
             Forms\Components\Section::make('H — Referral Source & Presenting Concern')
                 ->icon('heroicon-o-arrow-right-circle')
                 ->columns(2)
-                ->schema(self::sectionHSchema((int) request()->query('visit'))),
+                ->schema(self::sectionHSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ I — SERVICE SIGNPOSTING ══════════════════════════════════════════════
             Forms\Components\Section::make('I — Service Signposting & Booking')
                 ->description('Select clinical categories first, then choose primary and additional service postings. Bookings are PENDING — Payment Admin confirms after eligibility check.')
                 ->icon('heroicon-o-queue-list')
                 ->columns(1)
-                ->schema(self::sectionISchema((int) request()->query('visit'))),
+                ->schema(self::sectionISchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ J — PAYMENT PATHWAY ══════════════════════════════════════════════════
             Forms\Components\Section::make('J — Payment Pathway Preview')
@@ -2528,7 +2579,7 @@ class IntakeAssessmentResource extends Resource
                 ->icon('heroicon-o-banknotes')
                 ->collapsible()
                 ->columns(3)
-                ->schema(self::sectionJSchema((int) request()->query('visit'))),
+                ->schema(self::sectionJSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ K — DEFERRAL ══════════════════════════════════════════════════════════
             Forms\Components\Section::make('K — Deferral & Closure')
@@ -2536,13 +2587,13 @@ class IntakeAssessmentResource extends Resource
                 ->collapsible()
                 ->collapsed(true)
                 ->columns(2)
-                ->schema(self::sectionKSchema((int) request()->query('visit'))),
+                ->schema(self::sectionKSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
             // ══ L — ASSESSMENT SUMMARY & AUDIT ═══════════════════════════════════════
             Forms\Components\Section::make('L — Assessment Summary, Audit & Completion')
                 ->icon('heroicon-o-document-text')
                 ->columns(2)
-                ->schema(self::sectionLSchema((int) request()->query('visit'))),
+                ->schema(self::sectionLSchema(self::$currentVisitId ?: (int) request()->query('visit'))),
 
         ]);
     }
@@ -2588,6 +2639,11 @@ class IntakeAssessmentResource extends Resource
             'view'   => Pages\ViewIntakeAssessment::route('/{record}'),
             'edit'   => Pages\EditIntakeAssessment::route('/{record}/edit'),
         ];
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasRole(['super_admin', 'admin', 'intake_officer']) ?? false;
     }
 
     public static function canEdit(Model $record): bool

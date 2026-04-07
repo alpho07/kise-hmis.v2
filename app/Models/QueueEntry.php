@@ -9,11 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\SoftDeletes;
-
 class QueueEntry extends Model
 {
-    use HasFactory, SoftDeletes, TraitsBelongsToBranch;
+    use HasFactory, TraitsBelongsToBranch;
 
     protected $fillable = [
         'branch_id',

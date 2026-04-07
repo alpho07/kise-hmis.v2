@@ -33,7 +33,7 @@ class IntakeQueueResource extends Resource
         return parent::getEloquentQuery()
             ->where('current_stage', 'intake')
             ->with(['client', 'triage'])
-            ->latest('check_in_time');
+            ->orderBy('check_in_time', 'asc'); // FIFO: first checked in → first seen at intake
     }
 
     public static function getNavigationBadge(): ?string

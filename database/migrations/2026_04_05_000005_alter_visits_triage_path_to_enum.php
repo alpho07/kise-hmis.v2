@@ -13,15 +13,20 @@ return new class extends Migration {
                OR triage_path IS NULL
         ");
 
-        DB::statement("
-            ALTER TABLE visits
-            MODIFY COLUMN triage_path
-            ENUM('standard', 'returning', 'medical_veto', 'crisis') NULL
-        ");
+        // SQLite (testing) stores ENUM as TEXT — MODIFY COLUMN not supported, skip
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("
+                ALTER TABLE visits
+                MODIFY COLUMN triage_path
+                ENUM('standard', 'returning', 'medical_veto', 'crisis') NULL
+            ");
+        }
     }
 
     public function down(): void
     {
-        DB::statement("ALTER TABLE visits MODIFY COLUMN triage_path VARCHAR(255) NULL");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE visits MODIFY COLUMN triage_path VARCHAR(255) NULL");
+        }
     }
 };

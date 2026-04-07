@@ -5,6 +5,11 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+/.claude
+/.superpowers
+/.codex
+/playwright-report
+/Raw-draft outputs 3rd to 7th November 2025
 /.fleet
 /.idea
 /.nova

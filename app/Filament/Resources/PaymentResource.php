@@ -28,12 +28,12 @@ class PaymentResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with(['invoice', 'client', 'processedBy'])
-            ->latest('payment_date');
+            ->latest('received_at');
     }
 
     public static function getNavigationBadge(): ?string
     {
-        $todayCount = static::getModel()::whereDate('payment_date', today())->count();
+        $todayCount = static::getModel()::whereDate('received_at', today())->count();
         return $todayCount > 0 ? (string) $todayCount : null;
     }
 
@@ -136,7 +136,7 @@ class PaymentResource extends Resource
                     ])
                     ->formatStateUsing(fn($state) => ucfirst($state ?? 'completed')),
 
-                Tables\Columns\TextColumn::make('payment_date')
+                Tables\Columns\TextColumn::make('received_at')
                     ->label('Payment Date')
                     ->dateTime('d M Y, H:i')
                     ->sortable(),
@@ -165,24 +165,24 @@ class PaymentResource extends Resource
 
                 Tables\Filters\Filter::make('today')
                     ->label('Today')
-                    ->query(fn(Builder $query) => $query->whereDate('payment_date', today()))
+                    ->query(fn(Builder $query) => $query->whereDate('received_at', today()))
                     ->default(),
 
                 Tables\Filters\Filter::make('this_week')
                     ->label('This Week')
-                    ->query(fn(Builder $query) => $query->whereBetween('payment_date', [
+                    ->query(fn(Builder $query) => $query->whereBetween('received_at', [
                         now()->startOfWeek(),
                         now()->endOfWeek(),
                     ])),
 
                 Tables\Filters\Filter::make('this_month')
                     ->label('This Month')
-                    ->query(fn(Builder $query) => $query->whereMonth('payment_date', now()->month)),
+                    ->query(fn(Builder $query) => $query->whereMonth('received_at', now()->month)),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
             ])
-            ->defaultSort('payment_date', 'desc')
+            ->defaultSort('received_at', 'desc')
             ->emptyStateHeading('No payments recorded')
             ->emptyStateDescription('Completed payments will appear here')
             ->emptyStateIcon('heroicon-o-credit-card');

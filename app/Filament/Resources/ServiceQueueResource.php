@@ -43,6 +43,7 @@ class ServiceQueueResource extends Resource
             ->with([
                 'client',
                 'visit',
+                'visit.invoices',
                 'visit.serviceBookings.service.department',
                 'visit.intakeAssessment',
                 'visit.triage',
@@ -160,6 +161,20 @@ class ServiceQueueResource extends Resource
                         'heroicon-o-check-badge' => 'completed',
                     ]),
 
+                Tables\Columns\BadgeColumn::make('payment_status')
+                    ->label('Payment')
+                    ->state(fn (QueueEntry $record) => $record->visit?->payment_status ?? 'pending')
+                    ->colors([
+                        'danger'  => 'pending',
+                        'warning' => 'partial',
+                        'success' => 'paid',
+                    ])
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'paid'    => 'Paid',
+                        'partial' => 'Partial',
+                        default   => 'Awaiting Payment',
+                    }),
+
                 Tables\Columns\TextColumn::make('serviceProvider.name')
                     ->label('Provider')
                     ->default('Not assigned')
@@ -225,7 +240,15 @@ class ServiceQueueResource extends Resource
                     ->label('Start Service')
                     ->icon('heroicon-o-play')
                     ->color('success')
-                    ->visible(fn (QueueEntry $record) => $record->status === 'ready')
+                    ->visible(fn (QueueEntry $record) =>
+                        $record->status === 'ready' &&
+                        in_array($record->visit?->payment_status, ['paid', 'partial'], true)
+                    )
+                    ->tooltip(fn (QueueEntry $record) =>
+                        $record->status === 'ready' && !in_array($record->visit?->payment_status, ['paid', 'partial'], true)
+                            ? 'Payment pending — client must pay before service can start'
+                            : null
+                    )
                     ->requiresConfirmation()
                     ->modalHeading(fn (QueueEntry $record) => "Start Service for Queue #{$record->queue_number}")
                     ->modalDescription('Are you ready to begin serving this client?')
@@ -400,7 +423,10 @@ class ServiceQueueResource extends Resource
                     ->label('Call Client')
                     ->icon('heroicon-o-phone')
                     ->color('warning')
-                    ->visible(fn (QueueEntry $record) => $record->status === 'ready')
+                    ->visible(fn (QueueEntry $record) =>
+                        $record->status === 'ready' &&
+                        in_array($record->visit?->payment_status, ['paid', 'partial'], true)
+                    )
                     ->action(function (QueueEntry $record) {
                         Notification::make()
                             ->success()

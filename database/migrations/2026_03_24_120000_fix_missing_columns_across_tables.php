@@ -18,21 +18,40 @@ return new class extends Migration
         // 2. queue_entries — room assigned at service point
         if (!Schema::hasColumn('queue_entries', 'room_assigned')) {
             Schema::table('queue_entries', function (Blueprint $table) {
-                $table->string('room_assigned', 100)->nullable()->after('service_provider_id');
+                $table->string('room_assigned', 100)->nullable();
             });
         }
 
         // 3. service_bookings — string priority for PaymentRoutingService
         if (!Schema::hasColumn('service_bookings', 'priority')) {
             Schema::table('service_bookings', function (Blueprint $table) {
-                $table->string('priority', 20)->default('routine')->after('service_status');
+                $table->string('priority', 20)->default('routine');
             });
         }
+
+        // 3b. service_bookings — columns auto-set by ServiceBooking::boot() but missing from original migration
+        Schema::table('service_bookings', function (Blueprint $table) {
+            if (!Schema::hasColumn('service_bookings', 'client_id')) {
+                $table->foreignId('client_id')->nullable()->after('visit_id')->constrained()->nullOnDelete();
+            }
+            if (!Schema::hasColumn('service_bookings', 'department_id')) {
+                $table->foreignId('department_id')->nullable()->constrained()->nullOnDelete();
+            }
+            if (!Schema::hasColumn('service_bookings', 'estimated_duration')) {
+                $table->integer('estimated_duration')->nullable()->comment('Duration in minutes');
+            }
+            if (!Schema::hasColumn('service_bookings', 'session_count')) {
+                $table->integer('session_count')->default(1)->nullable();
+            }
+            if (!Schema::hasColumn('service_bookings', 'assigned_provider_id')) {
+                $table->foreignId('assigned_provider_id')->nullable()->constrained('users')->nullOnDelete();
+            }
+        });
 
         // 4. intake_assessments — payment routing & clinical fields
         Schema::table('intake_assessments', function (Blueprint $table) {
             if (!Schema::hasColumn('intake_assessments', 'expected_payment_method')) {
-                $table->string('expected_payment_method', 50)->nullable()->after('priority_level');
+                $table->string('expected_payment_method', 50)->nullable();
             }
             if (!Schema::hasColumn('intake_assessments', 'presenting_problem')) {
                 $table->text('presenting_problem')->nullable()->after('reason_for_visit');

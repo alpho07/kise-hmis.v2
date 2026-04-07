@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\IntakeAssessmentResource;
 use App\Filament\Resources\IntakeAssessmentResource\Pages\EditIntakeAssessment;
 use App\Models\Branch;
 use App\Models\Client;
@@ -27,6 +28,9 @@ class ImmunizationSectionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Clear static age cache so prior test classes don't poison Section E4 visibility.
+        IntakeAssessmentResource::clearAgeCache();
 
         foreach (['intake_officer', 'admin', 'super_admin'] as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);

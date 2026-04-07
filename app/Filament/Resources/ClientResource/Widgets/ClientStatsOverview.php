@@ -12,12 +12,12 @@ class ClientStatsOverview extends BaseWidget
     {
         $totalClients = Client::count();
         $activeClients = Client::active()->count();
-        $newThisMonth = Client::whereMonth('registration_date', now()->month)
-            ->whereYear('registration_date', now()->year)
+        $newThisMonth = Client::whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
             ->count();
         $withNCPWD = Client::whereNotNull('ncpwd_number')->count();
         $minors = Client::where('estimated_age', '<', 18)->count();
-        $recentVisits = Client::whereDate('last_visit_date', '>=', now()->subDays(30))->count();
+        $recentVisits = Client::whereHas('visits', fn($q) => $q->where('check_in_time', '>=', now()->subDays(30)))->count();
 
         return [
             Stat::make('Total Clients', number_format($totalClients))

@@ -2,34 +2,80 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Service extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
-    /**
-     * CATEGORY ENUM
-     */
-    public const CATEGORY_CHILD = 'child';
-    public const CATEGORY_ADULT = 'adult';
-    public const CATEGORY_BOTH  = 'both';
+    // ─── Age Group ───────────────────────────────────────────────────────────────
+    // WHO the service is for.  Used at intake to surface only age-appropriate
+    // options and in billing to auto-select the correct price tier.
 
+    public const AGE_GROUP_CHILD = 'child';   // clients < 18
+    public const AGE_GROUP_ADULT = 'adult';   // clients ≥ 18
+    public const AGE_GROUP_ALL   = 'all';     // any age (e.g. Ear Molds)
+
+    /** @return array<string, string>  value => label */
+    public static function ageGroupOptions(): array
+    {
+        return [
+            self::AGE_GROUP_CHILD => 'Child (< 18 yrs)',
+            self::AGE_GROUP_ADULT => 'Adult (≥ 18 yrs)',
+            self::AGE_GROUP_ALL   => 'All Ages',
+        ];
+    }
+
+    // ─── Business Category ───────────────────────────────────────────────────────
+    // WHAT kind of service it is.  Orthogonal to age_group.
+
+    public const CATEGORY_ASSESSMENT         = 'Assessment';
+    public const CATEGORY_THERAPY            = 'Therapy';
+    public const CATEGORY_COUNSELING         = 'Counseling';
+    public const CATEGORY_CONSULTATION       = 'Consultation';
+    public const CATEGORY_ASSISTIVE_TECH     = 'Assistive Technology';
+
+    /** @return array<string, string> */
     public static function categoryOptions(): array
     {
         return [
-            self::CATEGORY_CHILD => 'Child',
-            self::CATEGORY_ADULT => 'Adult',
-            self::CATEGORY_BOTH  => 'Both',
+            self::CATEGORY_ASSESSMENT     => 'Assessment',
+            self::CATEGORY_THERAPY        => 'Therapy',
+            self::CATEGORY_COUNSELING     => 'Counseling',
+            self::CATEGORY_CONSULTATION   => 'Consultation',
+            self::CATEGORY_ASSISTIVE_TECH => 'Assistive Technology',
         ];
     }
+
+    // ─── Service Type ────────────────────────────────────────────────────────────
+
+    public const TYPE_ASSESSMENT         = 'assessment';
+    public const TYPE_THERAPY            = 'therapy';
+    public const TYPE_CONSULTATION       = 'consultation';
+    public const TYPE_ASSISTIVE_TECH     = 'assistive_technology';
+    public const TYPE_SCREENING          = 'screening';
+
+    /** @return array<string, string> */
+    public static function serviceTypeOptions(): array
+    {
+        return [
+            self::TYPE_ASSESSMENT     => 'Assessment',
+            self::TYPE_THERAPY        => 'Therapy',
+            self::TYPE_CONSULTATION   => 'Consultation',
+            self::TYPE_ASSISTIVE_TECH => 'Assistive Technology',
+            self::TYPE_SCREENING      => 'Screening',
+        ];
+    }
+
+    // ─── Fillable ────────────────────────────────────────────────────────────────
 
     protected $fillable = [
         'code',
@@ -48,6 +94,7 @@ class Service extends Model
         'available_from',
         'available_until',
         'category',
+        'age_group',
         'subcategory',
         'notes',
         'service_type',
@@ -55,42 +102,25 @@ class Service extends Model
         'default_session_count',
     ];
 
+    // ─── Casts ───────────────────────────────────────────────────────────────────
+
     protected $casts = [
-        'base_price' => 'decimal:2',
-        'sha_price' => 'decimal:2',
-        'ncpwd_price' => 'decimal:2',
+        'base_price'          => 'decimal:2',
+        'sha_price'           => 'decimal:2',
+        'ncpwd_price'         => 'decimal:2',
         'requires_assessment' => 'boolean',
-        'is_recurring' => 'boolean',
-        'is_active' => 'boolean',
-        'sha_covered' => 'boolean',
-        'ncpwd_covered' => 'boolean',
-        'duration_minutes' => 'integer',
-        'available_from' => 'date',
-        'available_until' => 'date',
-        'requires_sessions' => 'boolean',
+        'is_recurring'        => 'boolean',
+        'is_active'           => 'boolean',
+        'sha_covered'         => 'boolean',
+        'ncpwd_covered'       => 'boolean',
+        'duration_minutes'    => 'integer',
+        'available_from'      => 'date',
+        'available_until'     => 'date',
+        'requires_sessions'   => 'boolean',
         'default_session_count' => 'integer',
     ];
 
-    /**
-     * RELATIONSHIPS
-     */
-
-    /**
-     * Get all service requests for this service
-     */
-    public function serviceRequests(): HasMany
-    {
-        return $this->hasMany(ServiceRequest::class);
-    }
-
-    /**
-     * Get pending service requests
-     */
-    public function pendingRequests()
-    {
-        return $this->serviceRequests()
-            ->where('status', 'pending_payment');
-    }
+    // ─── Relationships ───────────────────────────────────────────────────────────
 
     public function department(): BelongsTo
     {
@@ -122,6 +152,11 @@ class Service extends Model
         return $this->hasMany(ServiceInsurancePrice::class);
     }
 
+    public function serviceRequests(): HasMany
+    {
+        return $this->hasMany(ServiceRequest::class);
+    }
+
     public function assessmentForms(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -130,9 +165,95 @@ class Service extends Model
         );
     }
 
+    // ─── Scopes ──────────────────────────────────────────────────────────────────
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeByDepartment(Builder $query, int $departmentId): Builder
+    {
+        return $query->where('department_id', $departmentId);
+    }
+
     /**
-     * PRICE HANDLING
+     * Filter services appropriate for a specific age group.
+     * Includes records explicitly targeting that group AND records marked 'all'.
+     *
+     * @param  string  $ageGroup  self::AGE_GROUP_CHILD | AGE_GROUP_ADULT | AGE_GROUP_ALL
      */
+    public function scopeForAgeGroup(Builder $query, string $ageGroup): Builder
+    {
+        if ($ageGroup === self::AGE_GROUP_ALL) {
+            return $query;
+        }
+
+        return $query->whereIn('age_group', [$ageGroup, self::AGE_GROUP_ALL]);
+    }
+
+    /**
+     * Filter services appropriate for a given Client, based on their age.
+     * Resolves age from estimated_age falling back to date_of_birth.
+     */
+    public function scopeForClient(Builder $query, Client $client): Builder
+    {
+        $age = $client->estimated_age
+            ?? ($client->date_of_birth ? $client->date_of_birth->age : null);
+
+        if ($age === null) {
+            // Age unknown — return all services so the intake officer can choose
+            return $query;
+        }
+
+        $ageGroup = $age < 18 ? self::AGE_GROUP_CHILD : self::AGE_GROUP_ADULT;
+
+        return $query->whereIn('age_group', [$ageGroup, self::AGE_GROUP_ALL]);
+    }
+
+    public function scopeByCategory(Builder $query, string $category): Builder
+    {
+        return $query->where('category', $category);
+    }
+
+    public function scopeByServiceType(Builder $query, string $type): Builder
+    {
+        return $query->where('service_type', $type);
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+    public function isChildService(): bool
+    {
+        return $this->age_group === self::AGE_GROUP_CHILD;
+    }
+
+    public function isAdultService(): bool
+    {
+        return $this->age_group === self::AGE_GROUP_ADULT;
+    }
+
+    public function isAvailableForAge(?int $age): bool
+    {
+        if ($age === null) return true;
+
+        return match ($this->age_group) {
+            self::AGE_GROUP_CHILD => $age < 18,
+            self::AGE_GROUP_ADULT => $age >= 18,
+            default               => true,
+        };
+    }
+
+    public function isAvailableForClient(Client $client): bool
+    {
+        $age = $client->estimated_age
+            ?? ($client->date_of_birth ? $client->date_of_birth->age : null);
+
+        return $this->isAvailableForAge($age);
+    }
+
+    // ─── Pricing ─────────────────────────────────────────────────────────────────
+
     public function getPriceForInsurance(InsuranceProvider $insurance): ?ServiceInsurancePrice
     {
         return $this->insurancePrices()
@@ -150,14 +271,12 @@ class Service extends Model
             }
         }
 
-        return $this->base_price;
+        return (float) $this->base_price;
     }
 
     public function isCoveredBy(?InsuranceProvider $insurance = null): bool
     {
-        if (!$insurance) {
-            return false;
-        }
+        if (!$insurance) return false;
 
         return $this->insurancePrices()
             ->where('insurance_provider_id', $insurance->id)
@@ -165,50 +284,20 @@ class Service extends Model
             ->exists();
     }
 
-    /**
-     * SCOPES
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
+    // ─── Mutators ────────────────────────────────────────────────────────────────
 
-    public function scopeByDepartment($query, $departmentId)
-    {
-        return $query->where('department_id', $departmentId);
-    }
-
-    public function scopeChild($query)
-    {
-        return $query->where('category', self::CATEGORY_CHILD);
-    }
-
-    public function scopeAdult($query)
-    {
-        return $query->where('category', self::CATEGORY_ADULT);
-    }
-
-    public function scopeBoth($query)
-    {
-        return $query->where('category', self::CATEGORY_BOTH);
-    }
-
-    /**
-     * ACCESSORS & MUTATORS
-     */
-    public function setCodeAttribute($value)
+    public function setCodeAttribute(string $value): void
     {
         $this->attributes['code'] = strtoupper($value);
     }
 
-    public function setNameAttribute($value)
+    public function setNameAttribute(string $value): void
     {
         $this->attributes['name'] = ucwords(strtolower($value));
     }
 
-    /**
-     * SPATIE ACTIVITY LOGGING
-     */
+    // ─── Activity Logging ────────────────────────────────────────────────────────
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -217,11 +306,11 @@ class Service extends Model
                 'code',
                 'base_price',
                 'is_active',
+                'age_group',
                 'category',
                 'service_type',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
-
 }

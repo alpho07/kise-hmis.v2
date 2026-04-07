@@ -37,7 +37,8 @@ class CashierQueueResource extends Resource
         return parent::getEloquentQuery()
             ->where('current_stage', 'cashier')
             ->whereHas('invoice')
-            ->with(['client', 'invoice']);
+            ->with(['client', 'invoice'])
+            ->orderBy('check_in_time', 'asc'); // FIFO: first checked in → first served
     }
 
       public static function getServiceRequestsTable(): Tables\Table
@@ -210,7 +211,7 @@ class CashierQueueResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('priority', 'asc')
+            ->defaultSort('check_in_time', 'asc') // FIFO by check-in time
             ->poll('30s'); // Auto-refresh every 30 seconds
     }
 
@@ -262,7 +263,7 @@ class CashierQueueResource extends Resource
                     ->since()
                     ->sortable(),
             ])
-            ->defaultSort('created_at', 'asc')
+            ->defaultSort('check_in_time', 'asc') // FIFO by check-in time
             ->poll('10s')
             ->actions([
                 Tables\Actions\Action::make('process_payment')

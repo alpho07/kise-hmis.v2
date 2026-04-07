@@ -49,7 +49,7 @@ class ServiceResource extends Resource
                 ])
                 ->columns(2),
 
-            Forms\Components\Section::make('Department & Category')
+            Forms\Components\Section::make('Department & Classification')
                 ->schema([
                     Forms\Components\Select::make('department_id')
                         ->relationship('department', 'name')
@@ -57,19 +57,23 @@ class ServiceResource extends Resource
                         ->searchable()
                         ->label('Department'),
 
+                    Forms\Components\Select::make('age_group')
+                        ->label('Age Group')
+                        ->required()
+                        ->options(Service::ageGroupOptions())
+                        ->default(Service::AGE_GROUP_ALL)
+                        ->native(false)
+                        ->helperText('Who this service is for — used at intake to surface only age-appropriate options.'),
+
                     Forms\Components\Select::make('category')
                         ->label('Service Category')
                         ->required()
-                        ->options([
-                            'child' => 'Child',
-                            'adult' => 'Adult',
-                            'both'  => 'Both',
-                        ])
+                        ->options(Service::categoryOptions())
                         ->native(false)
                         ->searchable()
-                        ->helperText("Specify whether this service is for a Child, Adult, or Both"),
+                        ->helperText('The clinical/business type of service.'),
                 ])
-                ->columns(2),
+                ->columns(3),
 
             Forms\Components\Section::make('Pricing')
                 ->schema([
@@ -230,14 +234,29 @@ class ServiceResource extends Resource
                     ->label('Department')
                     ->sortable(),
 
+                Tables\Columns\BadgeColumn::make('age_group')
+                    ->label('Age Group')
+                    ->colors([
+                        'success' => Service::AGE_GROUP_CHILD,
+                        'primary' => Service::AGE_GROUP_ADULT,
+                        'gray'    => Service::AGE_GROUP_ALL,
+                    ])
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        Service::AGE_GROUP_CHILD => 'Child',
+                        Service::AGE_GROUP_ADULT => 'Adult',
+                        default                  => 'All Ages',
+                    })
+                    ->sortable(),
+
                 Tables\Columns\BadgeColumn::make('category')
                     ->label('Category')
                     ->colors([
-                        'success' => 'child',
-                        'primary' => 'adult',
-                        'warning' => 'both',
-                    ])
-                    ->formatStateUsing(fn ($state) => ucfirst($state)),
+                        'info'    => Service::CATEGORY_ASSESSMENT,
+                        'success' => Service::CATEGORY_THERAPY,
+                        'warning' => Service::CATEGORY_COUNSELING,
+                        'gray'    => Service::CATEGORY_CONSULTATION,
+                        'primary' => Service::CATEGORY_ASSISTIVE_TECH,
+                    ]),
 
                 Tables\Columns\TextColumn::make('base_price')
                     ->label('Price')
@@ -277,13 +296,17 @@ class ServiceResource extends Resource
             ])
 
             ->filters([
+                Tables\Filters\SelectFilter::make('age_group')
+                    ->label('Age Group')
+                    ->options(Service::ageGroupOptions()),
+
                 Tables\Filters\SelectFilter::make('category')
-                    ->label('Service Category')
-                    ->options([
-                        'child' => 'Child',
-                        'adult' => 'Adult',
-                        'both'  => 'Both',
-                    ]),
+                    ->label('Category')
+                    ->options(Service::categoryOptions()),
+
+                Tables\Filters\SelectFilter::make('department_id')
+                    ->label('Department')
+                    ->relationship('department', 'name'),
 
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active Service'),

@@ -82,7 +82,7 @@ return new class extends Migration
             
             // Expiration tracking
             if (!Schema::hasColumn('triages', 'is_expired')) {
-                $table->boolean('is_expired')->default(false)->after('cleared_at');
+                $table->boolean('is_expired')->default(false);
             }
             if (!Schema::hasColumn('triages', 'expires_at')) {
                 $table->timestamp('expires_at')->nullable()->after('is_expired');

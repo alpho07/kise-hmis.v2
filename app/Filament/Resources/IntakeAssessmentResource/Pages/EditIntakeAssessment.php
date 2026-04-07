@@ -6,12 +6,40 @@ use App\Filament\Resources\IntakeAssessmentResource;
 use App\Models\ClientMedicalHistory;
 use App\Models\ClientSocioDemographic;
 use Filament\Actions;
+use Filament\Forms\Form;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Facades\Auth;
 
 class EditIntakeAssessment extends EditRecord
 {
     protected static string $resource = IntakeAssessmentResource::class;
+
+    protected function getForms(): array
+    {
+        IntakeAssessmentResource::$currentVisitId = (int) ($this->getRecord()->visit_id ?? 0);
+
+        return [
+            'form' => $this->form(IntakeAssessmentResource::form(
+                $this->makeForm()
+                    ->operation('edit')
+                    ->model($this->getRecord())
+                    ->statePath($this->getFormStatePath())
+                    ->columns($this->hasInlineLabels() ? 1 : 2)
+                    ->inlineLabel($this->hasInlineLabels()),
+            )),
+        ];
+    }
+
+    protected function fillForm(): void
+    {
+        IntakeAssessmentResource::$currentVisitId = (int) ($this->record?->visit_id ?? 0);
+
+        parent::fillForm();
+
+        $this->data['imm_epi_status'] = is_array($this->data['imm_epi_status'] ?? null)
+            ? $this->data['imm_epi_status']
+            : [];
+    }
 
     protected function getHeaderActions(): array
     {

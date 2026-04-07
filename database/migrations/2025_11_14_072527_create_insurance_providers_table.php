@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('code')->unique();
             $table->string('name');
             $table->string('short_name')->nullable();
-            $table->enum('type', ['public', 'private', 'government'])->default('private');
+            $table->enum('type', ['public', 'private', 'government', 'government_scheme', 'ecitizen'])->default('private');
             $table->text('description')->nullable();
             $table->string('contact_person')->nullable();
             $table->string('phone')->nullable();

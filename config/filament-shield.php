@@ -28,7 +28,10 @@ return [
     ],
 
     'panel_user' => [
-        'enabled' => true,
+        // Disabled: panel access is controlled via User::canAccessPanel()
+        // which checks is_active. Adding a separate panel_user role requirement
+        // would block all workflow-specific roles (receptionist, triage_nurse, etc.)
+        'enabled' => false,
         'name' => 'panel_user',
     ],
 
