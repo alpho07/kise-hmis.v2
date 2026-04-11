@@ -13,14 +13,12 @@ use App\Models\Service;
 use App\Models\User;
 use App\Models\Visit;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ImmunizationSectionTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected User $intakeOfficer;
     protected Branch $branch;

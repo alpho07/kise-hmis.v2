@@ -11,7 +11,6 @@ use App\Models\ServiceInsurancePrice;
 use App\Models\User;
 use App\Models\Visit;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -24,7 +23,6 @@ use Tests\TestCase;
  */
 class NcpwdAgeRestrictionTest extends TestCase
 {
-    use RefreshDatabase;
 
     private Branch $branch;
     private User $intakeOfficer;

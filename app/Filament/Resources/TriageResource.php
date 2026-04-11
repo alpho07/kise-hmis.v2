@@ -262,8 +262,8 @@ class TriageResource extends Resource
   <!-- Details grid -->
   <div style="background:#fff;padding:16px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px 24px;">
     <div>
-      <p style="' . $S . '">Phone</p>
-      <p style="' . $V . '">' . e($client->phone_primary ?? '—') . '</p>
+      <p style="' . $S . '">' . (($age !== null && $age < 18) ? 'Guardian Phone' : 'Phone') . '</p>
+      <p style="' . $V . '">' . e(($age !== null && $age < 18 && $client->guardian_phone) ? $client->guardian_phone : ($client->phone_primary ?? '—')) . '</p>
     </div>
     <div>
       <p style="' . $S . '">Location</p>
@@ -614,7 +614,7 @@ class TriageResource extends Resource
                     ->icon('heroicon-o-chat-bubble-left-ellipsis')
                     ->collapsible()
                     ->schema([
-                        Forms\Components\Textarea::make('chief_complaint')
+                        Forms\Components\Textarea::make('presenting_complaint')
                             ->label('Complaints')
                             ->rows(3)
                             ->maxLength(500)

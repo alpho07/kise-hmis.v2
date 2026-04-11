@@ -27,6 +27,7 @@ class ClientEducation extends Model
         'performance_concern',
         'performance_notes',
         'employment_status',
+        'employment_status_other',
         'occupation_type',
         'employer_name',
         'education_notes',

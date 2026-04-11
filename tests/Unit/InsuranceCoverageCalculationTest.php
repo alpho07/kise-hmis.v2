@@ -8,7 +8,6 @@ use App\Models\InsuranceProvider;
 
 use App\Models\Service;
 use App\Models\ServiceInsurancePrice;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
@@ -24,7 +23,6 @@ use Tests\TestCase;
  */
 class InsuranceCoverageCalculationTest extends TestCase
 {
-    use RefreshDatabase;
 
     private function makeProvider(string $code, float $defaultCoverage): InsuranceProvider
     {

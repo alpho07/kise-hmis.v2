@@ -683,6 +683,18 @@ class IntakeAssessmentResource extends Resource
         ];
     }
 
+    public static function screeningDomainLabel(?string $bandKey, string $domainKey): string
+    {
+        return self::screeningQuestions()[$bandKey]['domains'][$domainKey]['label']
+            ?? ucwords(str_replace('_', ' ', $domainKey));
+    }
+
+    public static function screeningQuestionText(?string $bandKey, string $domainKey, string $questionKey): string
+    {
+        return self::screeningQuestions()[$bandKey]['domains'][$domainKey]['questions'][$questionKey]['text']
+            ?? ucwords(str_replace('_', ' ', $questionKey));
+    }
+
     // ─── Build one age-band screening section ────────────────────────────────────
 
     private static function buildBandSection(string $bandKey, array $band): Forms\Components\Section
@@ -768,7 +780,9 @@ class IntakeAssessmentResource extends Resource
                     $ct = Visit::with('client')->find($visitId)?->client?->client_type ?? 'new';
                     return match ($ct) { 'returning' => 'returning_client', 'old_new' => 'old_new_client', default => 'new_client' };
                 })
-                ->required()
+                ->disabled()
+                ->dehydrated()
+                ->hint('Auto-set from client registration — not editable here')
                 ->columnSpanFull(),
 
             Forms\Components\TextInput::make('b_national_id')
@@ -896,21 +910,34 @@ class IntakeAssessmentResource extends Resource
                     'multiple'     => 'Multiple Disabilities',
                     'other'        => 'Other (specify in notes)',
                 ])
+                ->default([])
+                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                    if (!is_array($state)) {
+                        $component->state([]);
+                    }
+                })
                 ->columns(3)
-                ->visible(fn(Get $get) => $get('dis_is_disability_known'))
-                ->columnSpanFull(),
+                ->columnSpanFull()
+                // No ->visible() — keeps state in Livewire snapshot at all times.
+                // ->visible() calls Arr::forget() when hidden, stripping the array from the
+                // snapshot and turning it into a boolean `true` on the next checkbox click.
+                // No ->live() — prevents a Livewire round-trip on each click, which was
+                // corrupting the array type before it could be read by getInputValue().
+                // ->extraFieldWrapperAttributes() targets the outer wrapper (including label),
+                // whereas ->extraAttributes() only targets the inner grid element.
+                ->extraFieldWrapperAttributes(['x-show' => '!! ($wire.sectionData?.C?.dis_is_disability_known)']),
 
             Forms\Components\Select::make('dis_onset')
                 ->label('Onset')
                 ->options(['congenital' => 'Congenital (from birth)', 'acquired' => 'Acquired', 'unknown' => 'Unknown'])
                 ->native(false)
-                ->visible(fn(Get $get) => $get('dis_is_disability_known')),
+                ->visible(fn(Get $get) => (bool) $get('dis_is_disability_known')),
 
             Forms\Components\Select::make('dis_level_of_functioning')
                 ->label('Level of Functioning')
                 ->options(['mild' => 'Mild', 'moderate' => 'Moderate', 'severe' => 'Severe', 'profound' => 'Profound'])
                 ->native(false)
-                ->visible(fn(Get $get) => $get('dis_is_disability_known')),
+                ->visible(fn(Get $get) => (bool) $get('dis_is_disability_known')),
 
             Forms\Components\Radio::make('dis_ncpwd_registered')
                 ->label('NCPWD Registered?')
@@ -918,49 +945,52 @@ class IntakeAssessmentResource extends Resource
                 ->inline()
                 ->inlineLabel(false)
                 ->live()
-                ->visible(fn(Get $get) => $get('dis_is_disability_known'))
-                ->columnSpanFull(),
+                ->columnSpanFull()
+                ->visible(fn(Get $get) => (bool) $get('dis_is_disability_known')),
 
-            Forms\Components\TextInput::make('dis_ncpwd_number')
-                ->label('NCPWD Number')
-                ->placeholder('NCPWD-XXXXXX')
-                ->prefixIcon('heroicon-o-identification')
-                ->helperText('Format: NCPWD-XXXXXX — system will validate checksum when available')
-                ->default(fn() => Visit::with('client')->find($visitId)?->client?->ncpwd_number)
-                ->visible(fn(Get $get) => $get('dis_is_disability_known') && $get('dis_ncpwd_registered') === 'yes')
-                ->required(fn(Get $get) => $get('dis_ncpwd_registered') === 'yes'),
+            // NCPWD sub-fields — only when registered = yes
+            Forms\Components\Group::make([
+                Forms\Components\TextInput::make('dis_ncpwd_number')
+                    ->label('NCPWD Number')
+                    ->placeholder('NCPWD-XXXXXX')
+                    ->prefixIcon('heroicon-o-identification')
+                    ->helperText('Format: NCPWD-XXXXXX — system will validate checksum when available')
+                    ->default(fn() => Visit::with('client')->find($visitId)?->client?->ncpwd_number)
+                    ->required(fn(Get $get) => (bool) $get('dis_ncpwd_registered') === true),
 
-            Forms\Components\Select::make('dis_ncpwd_verification_status')
-                ->label('NCPWD Card Status')
-                ->options([
-                    'seen'     => 'Seen (physical card inspected)',
-                    'uploaded' => 'Uploaded (copy attached below)',
-                    'verified' => 'Verified (system confirmed)',
-                ])
-                ->native(false)
-                ->helperText('Select the current verification status of the NCPWD card')
-                ->visible(fn(Get $get) => $get('dis_is_disability_known') && $get('dis_ncpwd_registered') === 'yes')
-                ->required(fn(Get $get) => $get('dis_ncpwd_registered') === 'yes'),
+                Forms\Components\Select::make('dis_ncpwd_verification_status')
+                    ->label('NCPWD Card Status')
+                    ->options([
+                        'seen'     => 'Seen (physical card inspected)',
+                        'uploaded' => 'Uploaded (copy attached below)',
+                        'verified' => 'Verified (system confirmed)',
+                    ])
+                    ->native(false)
+                    ->helperText('Select the current verification status of the NCPWD card')
+                    ->required(fn(Get $get) => (bool) $get('dis_ncpwd_registered') === true),
 
-            Forms\Components\FileUpload::make('dis_evidence_files')
-                ->label('Evidence Attachments (ID / Birth Certificate / NCPWD Card)')
-                ->helperText('Upload copies of relevant identification and disability documents')
-                ->multiple()
-                ->disk('public')
-                ->directory('disability-evidence')
-                ->acceptedFileTypes(['image/jpeg', 'image/png', 'application/pdf'])
-                ->maxSize(5120)
-                ->maxFiles(5)
-                ->downloadable()
-                ->previewable(false)
-                ->visible(fn(Get $get) => $get('dis_is_disability_known') && $get('dis_ncpwd_registered') === 'yes')
-                ->columnSpanFull(),
+                Forms\Components\FileUpload::make('dis_evidence_files')
+                    ->label('Evidence Attachments (ID / Birth Certificate / NCPWD Card)')
+                    ->helperText('Upload copies of relevant identification and disability documents')
+                    ->multiple()
+                    ->disk('public')
+                    ->directory('disability-evidence')
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'application/pdf'])
+                    ->maxSize(5120)
+                    ->maxFiles(5)
+                    ->downloadable()
+                    ->previewable(false)
+                    ->columnSpanFull(),
+            ])
+            ->columns(2)
+            ->columnSpanFull()
+            ->visible(fn(Get $get) => (bool) $get('dis_is_disability_known') && $get('dis_ncpwd_registered') === 'yes'),
 
             Forms\Components\Textarea::make('dis_disability_notes')
                 ->label('Disability Notes')
                 ->rows(2)
-                ->visible(fn(Get $get) => $get('dis_is_disability_known'))
-                ->columnSpanFull(),
+                ->columnSpanFull()
+                ->visible(fn(Get $get) => (bool) $get('dis_is_disability_known')),
         ];
     }
 
@@ -1024,6 +1054,10 @@ class IntakeAssessmentResource extends Resource
                     'community'       => 'Community Group',
                     'other'           => 'Other (specify)',
                 ])
+                ->default([])
+                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                    if (!is_array($state)) { $component->state([]); }
+                })
                 ->columns(3)
                 ->live()
                 ->columnSpanFull(),
@@ -1032,7 +1066,7 @@ class IntakeAssessmentResource extends Resource
                 ->label('Other Support Source — Specify')
                 ->placeholder('Specify…')
                 ->columnSpanFull()
-                ->visible(fn(Get $get) => \in_array('other', (array)($get('socio_source_of_support') ?? []), true)),
+                ->visible(fn(Get $get) => \in_array('other', (array) ($get('socio_source_of_support') ?? []), true)),
 
             Forms\Components\Select::make('socio_primary_language')
                 ->label('Primary Language')
@@ -1112,6 +1146,10 @@ class IntakeAssessmentResource extends Resource
                             'none'            => 'None known',
                             'other'           => 'Other (specify)',
                         ])
+                        ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->helperText('Client-reported only.')
@@ -1159,6 +1197,10 @@ class IntakeAssessmentResource extends Resource
                             'none'          => 'None',
                             'other'         => 'Other (specify)',
                         ])
+                        ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->helperText('Attach report if available.')
@@ -1229,6 +1271,10 @@ class IntakeAssessmentResource extends Resource
                                     'headache'       => 'Headache',
                                     'other'          => 'Other',
                                 ])
+                                ->default([])
+                                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                                    if (!is_array($state)) { $component->state([]); }
+                                })
                                 ->columns(2),
 
                             Forms\Components\Select::make('severity')
@@ -1354,6 +1400,10 @@ class IntakeAssessmentResource extends Resource
                                     'care_maintenance'=> 'Care & maintenance',
                                     'none'           => 'None',
                                 ])
+                                ->default([])
+                                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                                    if (!is_array($state)) { $component->state([]); }
+                                })
                                 ->columns(2)
                                 ->helperText('"None" → system suggests User Training referral'),
 
@@ -1379,6 +1429,10 @@ class IntakeAssessmentResource extends Resource
                                     'community'   => 'Community / Transport',
                                     'therapy'     => 'Therapy',
                                 ])
+                                ->default([])
+                                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                                    if (!is_array($state)) { $component->state([]); }
+                                })
                                 ->columns(2)
                                 ->helperText('For service planning'),
 
@@ -1394,6 +1448,11 @@ class IntakeAssessmentResource extends Resource
                                     'battery_cost'   => 'Battery / Consumables cost',
                                     'other'          => 'Other — specify',
                                 ])
+                                ->default([])
+                                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                                    if (!is_array($state)) { $component->state([]); }
+                                })
+                                ->dehydratedWhenHidden()
                                 ->columns(2)
                                 ->visible(fn(Get $get) => \in_array($get('use_frequency'), ['rarely', 'not_using', null], true)),
 
@@ -1407,6 +1466,10 @@ class IntakeAssessmentResource extends Resource
                                     'vision_strain'       => 'Vision strain',
                                     'other'               => 'Other — specify',
                                 ])
+                                ->default([])
+                                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                                    if (!is_array($state)) { $component->state([]); }
+                                })
                                 ->columns(2)
                                 ->helperText('Any selected → AT Safety Risk flag'),
 
@@ -1491,6 +1554,11 @@ class IntakeAssessmentResource extends Resource
                                     'adl'               => 'ADL Aids',
                                     'other'             => 'Other',
                                 ])
+                                ->default([])
+                                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                                    if (!is_array($state)) { $component->state([]); }
+                                })
+                                ->dehydratedWhenHidden()
                                 ->columns(3)
                                 ->visible(fn(Get $get) => $get('e2_needs_at') === 'yes')
                                 ->columnSpanFull(),
@@ -1546,6 +1614,9 @@ class IntakeAssessmentResource extends Resource
                             'other'             => 'Other (specify)',
                         ])
                         ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->afterStateUpdated(function (mixed $state, Set $set): void {
@@ -1616,6 +1687,9 @@ class IntakeAssessmentResource extends Resource
                             'other'       => 'Other (specify)',
                         ])
                         ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->afterStateUpdated(function (mixed $state, Set $set): void {
@@ -1647,6 +1721,9 @@ class IntakeAssessmentResource extends Resource
                             'other'             => 'Other (specify)',
                         ])
                         ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->afterStateUpdated(function (mixed $state, Set $set): void {
@@ -1681,6 +1758,9 @@ class IntakeAssessmentResource extends Resource
                             'other'     => 'Other (specify)',
                         ])
                         ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->afterStateUpdated(function (mixed $state, Set $set): void {
@@ -1850,6 +1930,10 @@ class IntakeAssessmentResource extends Resource
                             'none'                  => 'None',
                             'other'                 => 'Other (specify)',
                         ])
+                        ->default([])
+                        ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                            if (!is_array($state)) { $component->state([]); }
+                        })
                         ->columns(3)
                         ->live()
                         ->helperText('Any clinical concern → auto-flags Speech & Language + Nutrition referral')
@@ -1996,6 +2080,12 @@ class IntakeAssessmentResource extends Resource
                 ->label('Occupation / Role')
                 ->placeholder('e.g. Teacher, Farmer, Hawker')
                 ->visible(function (Get $get) use ($visitId) { return self::resolveClientAge($get, $visitId) >= 18; }),
+
+            Forms\Components\Textarea::make('edu_education_notes')
+                ->label('Education & Work — Additional Notes')
+                ->placeholder('Any other relevant notes about education or employment…')
+                ->rows(3)
+                ->columnSpanFull(),
         ];
     }
 
@@ -2041,6 +2131,10 @@ class IntakeAssessmentResource extends Resource
                     'kise_internal'    => 'KISE Internal Referral',
                     'other'            => 'Other (specify)',
                 ])
+                ->default([])
+                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                    if (!is_array($state)) { $component->state([]); }
+                })
                 ->columns(3)
                 ->required()
                 ->live()
@@ -2108,6 +2202,10 @@ class IntakeAssessmentResource extends Resource
                     'nutrition'               => 'Nutrition',
                     'other'                   => 'Other',
                 ])
+                ->default([])
+                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                    if (!is_array($state)) { $component->state([]); }
+                })
                 ->columns(3)
                 ->live()
                 ->helperText('Selecting categories filters the service lists below.'),
@@ -2126,6 +2224,10 @@ class IntakeAssessmentResource extends Resource
                 ->label('Step 3 — Additional Services / Cross-Posting (optional)')
                 ->options(function (Get $get) {
                     return self::filteredServiceOptions($get);
+                })
+                ->default([])
+                ->afterStateHydrated(function (Forms\Components\CheckboxList $component, mixed $state): void {
+                    if (!is_array($state)) { $component->state([]); }
                 })
                 ->columns(2)
                 ->helperText('Each additional service creates a cross-posting booking. Leave blank if primary only.'),

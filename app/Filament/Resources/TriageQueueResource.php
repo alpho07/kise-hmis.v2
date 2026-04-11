@@ -113,13 +113,13 @@ class TriageQueueResource extends Resource
                             ->first();
                         
                         if ($triageStage) {
-                            $minutes = $triageStage->started_at->diffInMinutes(now());
+                            $minutes = round($triageStage->started_at->diffInSeconds(now()) / 60, 2);
                             if ($minutes < 60) {
-                                return "{$minutes} min";
+                                return number_format($minutes, 2) . ' min';
                             }
                             return $triageStage->started_at->diffForHumans();
                         }
-                        
+
                         return $record->check_in_time->diffForHumans();
                     })
                     ->badge()
@@ -131,7 +131,7 @@ class TriageQueueResource extends Resource
                             ->first();
                         
                         if ($triageStage) {
-                            $minutes = $triageStage->started_at->diffInMinutes(now());
+                            $minutes = $triageStage->started_at->diffInSeconds(now()) / 60;
                             if ($minutes > 45) return 'danger';
                             if ($minutes > 30) return 'warning';
                         }

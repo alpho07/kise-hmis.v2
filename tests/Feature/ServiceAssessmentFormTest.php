@@ -13,7 +13,6 @@ use App\Models\Service;
 use App\Models\ServiceBooking;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -31,7 +30,6 @@ use Tests\TestCase;
  */
 class ServiceAssessmentFormTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected Branch  $branch;
     protected User    $provider;

@@ -35,24 +35,25 @@ class CreateTriage extends CreateRecord
         // Get red flags from form data
         $redFlags = [];
         $redFlagFields = [
-            'red_flag_active_bleeding' => 'Active Bleeding',
-            'red_flag_severe_pain' => 'Severe Pain',
-            'red_flag_seizure' => 'Seizure/Convulsions',
-            'red_flag_altered_consciousness' => 'Altered Consciousness',
-            'red_flag_respiratory_distress' => 'Respiratory Distress',
-            'red_flag_low_oxygen' => 'SpO₂ < 92%',
-            'red_flag_fever_convulsions' => 'Fever with Convulsions',
-            'red_flag_suicidal_ideation' => 'Suicidal Ideation',
-            'red_flag_violent_behavior' => 'Violent Behavior',
-            'red_flag_suspected_abuse' => 'Suspected Abuse/Neglect',
+            'red_flag_active_bleeding'       => ['name' => 'Active Bleeding',         'category' => 'trauma'],
+            'red_flag_severe_pain'           => ['name' => 'Severe Pain',             'category' => 'other'],
+            'red_flag_seizure'               => ['name' => 'Seizure/Convulsions',     'category' => 'neurological'],
+            'red_flag_altered_consciousness' => ['name' => 'Altered Consciousness',   'category' => 'neurological'],
+            'red_flag_respiratory_distress'  => ['name' => 'Respiratory Distress',    'category' => 'respiratory'],
+            'red_flag_low_oxygen'            => ['name' => 'SpO₂ < 92%',             'category' => 'respiratory'],
+            'red_flag_fever_convulsions'     => ['name' => 'Fever with Convulsions',  'category' => 'neurological'],
+            'red_flag_suicidal_ideation'     => ['name' => 'Suicidal Ideation',       'category' => 'behavioral'],
+            'red_flag_violent_behavior'      => ['name' => 'Violent Behavior',        'category' => 'behavioral'],
+            'red_flag_suspected_abuse'       => ['name' => 'Suspected Abuse/Neglect', 'category' => 'behavioral'],
         ];
-        
-        foreach ($redFlagFields as $field => $label) {
+
+        foreach ($redFlagFields as $field => $meta) {
             if (!empty($data[$field])) {
                 $redFlags[] = [
-                    'flag_type' => $field,
-                    'description' => $label,
-                    'severity' => 'high',
+                    'flag_name'     => $meta['name'],
+                    'flag_category' => $meta['category'],
+                    'description'   => $meta['name'],
+                    'severity'      => 'critical',
                 ];
             }
             // Remove from main data (not in Triage fillable)
@@ -100,10 +101,11 @@ class CreateTriage extends CreateRecord
             if (!empty($this->redFlagsToCreate)) {
                 foreach ($this->redFlagsToCreate as $flagData) {
                     TriageRedFlag::create([
-                        'triage_id' => $triage->id,
-                        //'flag_category' => $flagData['flag_category'],
-                        'description' => $flagData['description'],
-                        'severity' => $flagData['severity'],
+                        'triage_id'    => $triage->id,
+                        'flag_name'    => $flagData['flag_name'],
+                        'flag_category'=> $flagData['flag_category'],
+                        'description'  => $flagData['description'],
+                        'severity'     => $flagData['severity'],
                     ]);
                 }
             }

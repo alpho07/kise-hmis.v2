@@ -17,9 +17,12 @@ class TriageRedFlag extends Model
 
     protected $fillable = [
         'triage_id',
-        'flag_type',
+        'flag_category',
+        'flag_name',
         'description',
         'severity',
+        'requires_immediate_attention',
+        'action_taken',
     ];
 
     protected $casts = [

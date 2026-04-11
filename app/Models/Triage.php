@@ -50,6 +50,10 @@ class Triage extends Model
         'clearance_status',
         'next_step',
         
+        // Complaints & Observations
+        'presenting_complaint',
+        'triage_notes',
+
         // Notes
         'notes',
         'handover_summary',

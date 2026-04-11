@@ -6,7 +6,6 @@ use App\Models\Branch;
 use App\Models\Client;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -21,7 +20,6 @@ use Tests\TestCase;
  */
 class ClientRegistrationTest extends TestCase
 {
-    use RefreshDatabase;
 
     private Branch $branch;
     private User $receptionist;

@@ -7,7 +7,6 @@ use App\Models\Client;
 use App\Models\Department;
 use App\Models\Service;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
@@ -21,7 +20,6 @@ use Tests\TestCase;
  */
 class ServiceAgeGroupScopeTest extends TestCase
 {
-    use RefreshDatabase;
 
     private Branch $branch;
 

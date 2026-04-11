@@ -9,7 +9,6 @@ use App\Models\QueueEntry;
 use App\Models\Service;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -25,7 +24,6 @@ use Tests\TestCase;
  */
 class ServiceQueuePaymentGateTest extends TestCase
 {
-    use RefreshDatabase;
 
     private Branch $branch;
     private User $serviceProvider;

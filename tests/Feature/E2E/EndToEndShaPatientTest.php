@@ -13,7 +13,6 @@ use App\Models\Service;
 use App\Models\Triage;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -28,7 +27,6 @@ use Tests\TestCase;
  */
 class EndToEndShaPatientTest extends TestCase
 {
-    use RefreshDatabase;
 
     private Branch            $branch;
     private User              $receptionist;

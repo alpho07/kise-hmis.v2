@@ -10,7 +10,6 @@ use App\Models\QueueEntry;
 use App\Models\Service;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Dusk\Browser;
 use Spatie\Permission\Models\Role;
@@ -30,7 +29,6 @@ use Tests\DuskTestCase;
  */
 class CashPatientWorkflowTest extends DuskTestCase
 {
-    use DatabaseMigrations;
 
     // ─── Shared seed helpers ──────────────────────────────────────────────────
 

@@ -4,14 +4,13 @@ namespace Tests\Feature\UI;
 
 use App\Filament\Resources\ServiceQueueResource;
 use App\Models\QueueEntry;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Tests\Support\WorkflowFixture;
 use Tests\TestCase;
 
 class ServiceQueueResourceTest extends TestCase
 {
-    use RefreshDatabase, WorkflowFixture;
+    use WorkflowFixture;
 
     protected function setUp(): void
     {

@@ -10,7 +10,6 @@ use App\Models\Service;
 use App\Models\Triage;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -24,7 +23,6 @@ use Tests\TestCase;
  */
 class AppointmentAndReturnPatientTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected Branch $branch;
     protected User   $receptionist;

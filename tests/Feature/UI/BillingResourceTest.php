@@ -5,7 +5,6 @@ namespace Tests\Feature\UI;
 use App\Filament\Resources\BillingResource;
 use App\Filament\Resources\BillingResource\Pages\ListBillings;
 use App\Models\Invoice;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use Tests\Support\WorkflowFixture;
@@ -13,7 +12,7 @@ use Tests\TestCase;
 
 class BillingResourceTest extends TestCase
 {
-    use RefreshDatabase, WorkflowFixture;
+    use WorkflowFixture;
 
     protected function setUp(): void
     {

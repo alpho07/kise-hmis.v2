@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ClientResource\Pages;
-use App\Filament\Resources\ClientResource\RelationManagers;
 use App\Models\Client;
 use App\Models\County;
 use App\Models\SubCounty;
@@ -443,13 +442,13 @@ class ClientResource extends Resource
                                         Forms\Components\Select::make('visit_type')
                                             ->label('Visit Type')
                                             ->options([
-                                                'new'       => '🆕 New Visit',
-                                                'follow_up' => '🔄 Follow-up',
-                                                'review'    => '📋 Review',
-                                                'emergency' => '🚨 Emergency',
+                                                'walk_in'     => '🚶 Walk-in',
+                                                'follow_up'   => '🔄 Follow-up',
+                                                'appointment' => '📅 Appointment',
+                                                'emergency'   => '🚨 Emergency',
                                             ])
                                             ->required()
-                                            ->default($record->client_type === 'returning' ? 'follow_up' : 'new')
+                                            ->default($record->client_type === 'returning' ? 'follow_up' : 'walk_in')
                                             ->native(false)
                                             ->columnSpanFull(),
 
@@ -526,10 +525,11 @@ class ClientResource extends Resource
                         }
 
                         // Create visit — boot() sets current_stage='reception' automatically
+                        $validVisitTypes = ['walk_in', 'appointment', 'follow_up', 'emergency'];
                         $visit = Visit::create([
                             'client_id'             => $record->id,
                             'branch_id'             => Auth::user()->branch_id,
-                            'visit_type'            => $data['visit_type'],
+                            'visit_type'            => in_array($data['visit_type'], $validVisitTypes) ? $data['visit_type'] : 'walk_in',
                             'visit_date'            => date('Y-m-d'),
                             'visit_purpose'         => $data['visit_purpose'],
                             'purpose_notes'         => $data['purpose_notes'] ?? null,
@@ -554,15 +554,7 @@ class ClientResource extends Resource
                             ->send();
                     }),
 
-                // Profile Hub
-                Tables\Actions\Action::make('profile_hub')
-                    ->label('Profile Hub')
-                    ->icon('heroicon-o-rectangle-stack')
-                    ->color('info')
-                    ->url(fn(Client $record) => route('filament.admin.pages.client-profile-hub', [
-                        'clientId' => $record->id,
-                    ]))
-                    ->openUrlInNewTab(),
+                
 
                 // View Client Details
                 Tables\Actions\ViewAction::make()
@@ -672,12 +664,13 @@ class ClientResource extends Resource
                         Forms\Components\Select::make('visit_type')
                             ->label('Visit Type')
                             ->options([
-                                'new'       => 'New Visit',
-                                'follow_up' => 'Follow-up',
-                                'review'    => 'Review',
+                                'walk_in'     => 'Walk-in',
+                                'follow_up'   => 'Follow-up',
+                                'appointment' => 'Appointment',
+                                'emergency'   => 'Emergency',
                             ])
                             ->required()
-                            ->default('new')
+                            ->default('walk_in')
                             ->native(false),
 
                         Forms\Components\Select::make('visit_purpose')
@@ -712,10 +705,11 @@ class ClientResource extends Resource
                             $client->update(['client_type' => 'old_new']);
                         }
 
+                        $validVisitTypes = ['walk_in', 'appointment', 'follow_up', 'emergency'];
                         $visit = Visit::create([
                             'client_id'      => $client->id,
                             'branch_id'      => Auth::user()->branch_id,
-                            'visit_type'     => $data['visit_type'],
+                            'visit_type'     => in_array($data['visit_type'], $validVisitTypes) ? $data['visit_type'] : 'walk_in',
                             'visit_date'     => today(),
                             'visit_purpose'  => $data['visit_purpose'],
                             'checked_in_by'  => Auth::id(),
@@ -743,15 +737,7 @@ class ClientResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            RelationManagers\AddressesRelationManager::class,
-            RelationManagers\ContactsRelationManager::class,
-            RelationManagers\InsurancesRelationManager::class,
-            RelationManagers\DocumentsRelationManager::class,
-            RelationManagers\AllergiesRelationManager::class,
-            RelationManagers\VisitsRelationManager::class,
-
-        ];
+        return [];
     }
 
     public static function getPages(): array

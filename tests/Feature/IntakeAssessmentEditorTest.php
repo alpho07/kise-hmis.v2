@@ -5,17 +5,16 @@ namespace Tests\Feature;
 use App\Filament\Pages\IntakeAssessmentEditor;
 use App\Models\Branch;
 use App\Models\Client;
+use App\Models\ClientDisability;
 use App\Models\IntakeAssessment;
 use App\Models\User;
 use App\Models\Visit;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class IntakeAssessmentEditorTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected User $intakeOfficer;
 
@@ -164,5 +163,90 @@ class IntakeAssessmentEditorTest extends TestCase
         Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
             ->call('finalize')
             ->assertNotified("Visit is deferred");
+    }
+
+    // ─── Section C — Disability Categories checkbox bug ──────────────────────
+
+    /**
+     * dis_disability_categories must start as an empty array, not null/true.
+     * A non-array initial state causes PHP's loose in_array to match all options.
+     */
+    public function test_section_c_disability_categories_initialises_as_empty_array(): void
+    {
+        $intake = $this->makeIntake();
+
+        Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
+            ->assertSet('sectionData.C.dis_disability_categories', []);
+    }
+
+    /**
+     * Legacy/live records may contain JSON false in disability_categories.
+     * The editor must normalize that to [] before the checkbox list renders.
+     */
+    public function test_section_c_legacy_false_disability_categories_initialises_as_empty_array(): void
+    {
+        $intake = $this->makeIntake();
+
+        ClientDisability::create([
+            'client_id' => $intake->client_id,
+            'is_disability_known' => true,
+            'disability_categories' => false,
+        ]);
+
+        Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
+            ->assertSet('sectionData.C.dis_disability_categories', []);
+    }
+
+    /**
+     * dis_disability_categories must be preserved when the toggle is off.
+     * Without ->dehydratedWhenHidden() the value was stripped to null when hidden,
+     * causing Livewire to treat the next click as a boolean toggle → all boxes checked.
+     */
+    public function test_section_c_disability_categories_preserved_while_toggle_is_off(): void
+    {
+        $intake = $this->makeIntake();
+
+        // Toggle starts OFF — categories still present as []
+        Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
+            ->assertSet('sectionData.C.dis_is_disability_known', false)
+            ->assertSet('sectionData.C.dis_disability_categories', []);
+    }
+
+    /**
+     * Selecting one disability category must produce a single-item array,
+     * not [true] which PHP's loose in_array would match against every option.
+     */
+    public function test_section_c_ticking_one_checkbox_selects_only_that_option(): void
+    {
+        $intake = $this->makeIntake();
+
+        Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
+            ->set('sectionData.C.dis_is_disability_known', true)
+            ->set('sectionData.C.dis_disability_categories', ['hearing'])
+            ->assertSet('sectionData.C.dis_disability_categories', ['hearing'])
+            // Must NOT contain all options
+            ->tap(function ($component) {
+                $cats = $component->get('sectionData.C.dis_disability_categories');
+                $this->assertIsArray($cats, 'categories must be an array');
+                $this->assertCount(1, $cats, 'only one category should be selected');
+                $this->assertContains('hearing', $cats);
+            });
+    }
+
+    /**
+     * After saving section C with one category, the DB must store only that value.
+     */
+    public function test_section_c_save_persists_single_category(): void
+    {
+        $intake = $this->makeIntake();
+
+        Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
+            ->set('sectionData.C.dis_is_disability_known', true)
+            ->set('sectionData.C.dis_disability_categories', ['visual'])
+            ->call('saveSectionData', 'C');
+
+        $disability = \App\Models\ClientDisability::where('client_id', $intake->client_id)->first();
+        $this->assertNotNull($disability);
+        $this->assertSame(['visual'], $disability->disability_categories);
     }
 }

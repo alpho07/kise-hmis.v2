@@ -619,7 +619,7 @@ $navGroups = [
                 </div>
             @else
                 <div class="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30 p-6 text-center">
-                    <x-filament::icon icon="heroicon-m-calendar-x-mark" class="w-9 h-9 text-gray-300 mx-auto mb-2"/>
+                    <x-filament::icon icon="heroicon-m-calendar" class="w-9 h-9 text-gray-300 mx-auto mb-2"/>
                     <p class="text-sm text-gray-500 dark:text-gray-400">No active visit today</p>
                 </div>
             @endif

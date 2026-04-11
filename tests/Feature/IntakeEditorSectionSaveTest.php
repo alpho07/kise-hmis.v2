@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\IntakeAssessmentEditor;
+use App\Http\Controllers\IntakeAssessmentReportController;
 use App\Models\Branch;
 use App\Models\Client;
 use App\Models\ClientDisability;
@@ -14,7 +15,6 @@ use App\Models\IntakeAssessment;
 use App\Models\User;
 use App\Models\Visit;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -29,7 +29,6 @@ use Tests\TestCase;
  */
 class IntakeEditorSectionSaveTest extends TestCase
 {
-    use RefreshDatabase;
 
     protected User $officer;
     protected Branch $branch;
@@ -348,6 +347,23 @@ class IntakeEditorSectionSaveTest extends TestCase
         $this->assertSame('single', $socio->marital_status);
         $this->assertSame('kiswahili', $socio->primary_language);
         $this->assertSame(['family', 'ngo'], $socio->source_of_support);
+    }
+
+    /**
+     * Legacy/live records may contain JSON false in source_of_support.
+     * The editor must normalize that to [] before the checkbox list renders.
+     */
+    public function test_section_D_legacy_false_source_of_support_initialises_as_empty_array(): void
+    {
+        $intake = $this->makeIntake();
+
+        ClientSocioDemographic::create([
+            'client_id' => $intake->client_id,
+            'source_of_support' => false,
+        ]);
+
+        Livewire::test(IntakeAssessmentEditor::class, ['intakeId' => $intake->id])
+            ->assertSet('sectionData.D.socio_source_of_support', []);
     }
 
     /**
@@ -787,6 +803,50 @@ class IntakeEditorSectionSaveTest extends TestCase
         $scores = IntakeAssessment::find($intake->id)->functional_screening_scores;
         $this->assertNotNull($scores);
         $this->assertArrayHasKey('band', $scores);
+    }
+
+    /** Section G report rows must show question text, not internal q1/q2 keys. */
+    public function test_section_G_report_displays_question_text_instead_of_question_keys(): void
+    {
+        $intake = $this->makeIntakeWithYoungClient(8);
+
+        $intake->update([
+            'functional_screening_scores' => [
+                'band' => 'b7y',
+                'age_months' => 96,
+                'answers' => [
+                    'hearing' => [
+                        'q1' => 'yes',
+                        'q2' => 'no',
+                    ],
+                ],
+            ],
+        ]);
+
+        FunctionalScreening::create([
+            'intake_assessment_id' => $intake->id,
+            'client_id' => $intake->client_id,
+            'overall_summary' => 'Screening summary.',
+        ]);
+
+        $html = view('intake.assessment-report', [
+            'intake' => $intake->fresh(['visit.branch', 'client.county', 'client.subCounty', 'client.ward', 'functionalScreening', 'assessedBy']),
+            'client' => $intake->client->fresh(['county', 'subCounty', 'ward']),
+            'visit' => $intake->visit->fresh(['branch']),
+            'sr' => [],
+            'disability' => null,
+            'socio' => null,
+            'med' => null,
+            'edu' => null,
+            'services' => collect(),
+            'screeningScores' => $intake->fresh()->functional_screening_scores,
+            'printedAt' => now(),
+            'printedBy' => $this->officer,
+            'labels' => IntakeAssessmentReportController::labels(),
+        ])->render();
+
+        $this->assertStringContainsString('Hears clearly in class without asking for repetition?', $html);
+        $this->assertStringNotContainsString('>Q1<', $html);
     }
 
     // ─── Section H: Presenting Concern ────────────────────────────────────────

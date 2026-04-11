@@ -122,7 +122,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
         }
         $this->sectionData['C'] = $disability ? [
             'dis_is_disability_known'        => $disability->is_disability_known,
-            'dis_disability_categories'      => $disability->disability_categories ?? [],
+            'dis_disability_categories'      => $this->arrayState($disability->disability_categories),
             'dis_onset'                      => $disability->onset,
             'dis_level_of_functioning'       => $disability->level_of_functioning,
             'dis_disability_notes'           => $disability->disability_notes,
@@ -132,8 +132,10 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'dis_ncpwd_verification_status'  => $disability->ncpwd_verification_status,
         ] : [
             // No disability record yet — still pre-fill NCPWD fields from client if the number exists
-            'dis_ncpwd_registered' => !empty($client->ncpwd_number) ? 'yes' : null,
-            'dis_ncpwd_number'     => $client->ncpwd_number,
+            'dis_is_disability_known'   => false,
+            'dis_disability_categories' => [],
+            'dis_ncpwd_registered'      => !empty($client->ncpwd_number) ? 'yes' : null,
+            'dis_ncpwd_number'          => $client->ncpwd_number,
         ];
 
         $socio = ClientSocioDemographic::where('client_id', $client->id)->first();
@@ -151,7 +153,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'socio_household_size'        => $socio->household_size,
             'socio_primary_caregiver'     => $caregiverIsOther ? 'other' : $caregiverRaw,
             'socio_caregiver_other'       => $caregiverIsOther ? substr($caregiverRaw, 7) : null,
-            'socio_source_of_support'     => $socio->source_of_support ?? [],
+            'socio_source_of_support'     => $this->arrayState($socio->source_of_support),
             'socio_other_support'         => $socio->other_support_source,
             'socio_school_enrolled'       => $socio->school_enrolled,
             'socio_primary_language'      => $langIsOther ? 'other' : $langRaw,
@@ -219,18 +221,19 @@ class IntakeAssessmentEditor extends Page implements HasForms
 
         $edu = ClientEducation::where('client_id', $client->id)->first();
         $this->sectionData['F'] = $edu ? [
-            'edu_education_level'        => $edu->education_level,
-            'edu_school_type'            => $edu->school_type,
-            'edu_school_name'            => $edu->school_name,
-            'edu_grade_level'            => $edu->grade_level,
-            'edu_currently_enrolled'     => $edu->currently_enrolled ? 'yes' : 'no',
-            'edu_attendance_challenges'  => $edu->attendance_challenges ? 'yes' : 'no',
-            'edu_attendance_notes'       => $edu->attendance_notes,
-            'edu_performance_concern'    => $edu->performance_concern ? 'yes' : 'no',
-            'edu_performance_notes'      => $edu->performance_notes,
-            'edu_employment_status'      => $edu->employment_status,
-            'edu_occupation_type'        => $edu->occupation_type,
-            'edu_education_notes'        => $edu->education_notes,
+            'edu_education_level'           => $edu->education_level,
+            'edu_school_type'               => $edu->school_type,
+            'edu_school_name'               => $edu->school_name,
+            'edu_grade_level'               => $edu->grade_level,
+            'edu_currently_enrolled'        => $edu->currently_enrolled ? 'yes' : 'no',
+            'edu_attendance_challenges'     => $edu->attendance_challenges ? 'yes' : 'no',
+            'edu_attendance_notes'          => $edu->attendance_notes,
+            'edu_performance_concern'       => $edu->performance_concern ? 'yes' : 'no',
+            'edu_performance_notes'         => $edu->performance_notes,
+            'edu_employment_status'         => $edu->employment_status,
+            'edu_employment_status_other'   => $edu->employment_status_other,
+            'edu_occupation_type'           => $edu->occupation_type,
+            'edu_education_notes'           => $edu->education_notes,
         ] : [];
 
         $scores = $intake->functional_screening_scores ?? [];
@@ -254,6 +257,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'i_service_categories' => $sr['service_categories'] ?? [],
             'services_selected'    => $sr['service_ids'] ?? [],
             'priority_level'       => $intake->priority_level,
+            'handover_note'        => $sr['handover_note'] ?? null,
         ];
 
         // Auto-detect enrolled schemes from client record on first load
@@ -269,14 +273,21 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'payment_notes'           => $sr['payment_notes'] ?? null,
         ];
 
-        // TODO: deferral_reason, deferral_notes, next_appointment_date do not yet exist on
-        // the visits table or intake_assessments table — they return null on initial load
-        // until the deferral migration is added (Task 8).
+        $isDeferred = $visit->status === 'deferred';
+        $rawDeferralReason = $visit->deferral_reason;
+        $deferralReasonOther = null;
+        if (str_starts_with($rawDeferralReason ?? '', 'other: ')) {
+            $deferralReasonOther = substr($rawDeferralReason, 7);
+            $rawDeferralReason   = 'other';
+        }
         $this->sectionData['K'] = [
-            'defer_client'          => $visit->status === 'deferred',
-            'deferral_reason'       => $visit->deferral_reason,
+            'defer_client'          => $isDeferred,
+            'deferral_reason'       => $rawDeferralReason,
+            'deferral_reason_other' => $deferralReasonOther,
             'deferral_notes'        => $visit->deferral_notes,
             'next_appointment_date' => $visit->next_appointment_date,
+            // UI-only confirmation: auto-true when visit is already deferred
+            'client_sensitized'     => $isDeferred,
         ];
 
         $this->sectionData['L'] = [
@@ -338,6 +349,16 @@ class IntakeAssessmentEditor extends Page implements HasForms
         }
 
         return null;
+    }
+
+    /**
+     * CheckboxList state must always be an array. Some live records contain
+     * JSON false/null from earlier saves, which makes Livewire treat the group
+     * as a boolean checkbox and check every option after one click.
+     */
+    protected function arrayState(mixed $state): array
+    {
+        return is_array($state) ? array_values($state) : [];
     }
 
     protected function flattenScreeningAnswers(array $scores): array
@@ -654,7 +675,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
             ['client_id' => $this->client->id],
             [
                 'is_disability_known'        => true,
-                'disability_categories'      => $data['dis_disability_categories']     ?? [],
+                'disability_categories'      => $this->arrayState($data['dis_disability_categories'] ?? []),
                 'onset'                      => $data['dis_onset']                      ?? null,
                 'level_of_functioning'       => $data['dis_level_of_functioning']       ?? null,
                 'disability_notes'           => $data['dis_disability_notes']           ?? null,
@@ -696,7 +717,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'living_arrangement_other' => $data['socio_living_other']           ?? null,
                 'household_size'           => $data['socio_household_size']         ?? null,
                 'primary_caregiver'        => $primaryCaregiver,
-                'source_of_support'        => $data['socio_source_of_support']      ?? [],
+                'source_of_support'        => $this->arrayState($data['socio_source_of_support'] ?? []),
                 'other_support_source'     => $data['socio_other_support']          ?? null,
                 'school_enrolled'          => $data['socio_school_enrolled']        ?? null,
                 'primary_language'         => $primaryLanguage,
@@ -837,24 +858,22 @@ class IntakeAssessmentEditor extends Page implements HasForms
 
     protected function saveSectionF(array $data): void
     {
-        // employment_status is an ENUM — store only the enum value, not 'other: ...'
-        $employmentStatus = $data['edu_employment_status'] ?? null;
-
         ClientEducation::updateOrCreate(
             ['client_id' => $this->client->id],
             [
-                'education_level'        => $data['edu_education_level']       ?? null,
-                'school_type'            => $data['edu_school_type']           ?? null,
-                'school_name'            => $data['edu_school_name']           ?? null,
-                'grade_level'            => $data['edu_grade_level']           ?? null,
-                'currently_enrolled'     => ($data['edu_currently_enrolled']   ?? null) === 'yes',
-                'attendance_challenges'  => ($data['edu_attendance_challenges'] ?? null) === 'yes',
-                'attendance_notes'       => $data['edu_attendance_notes']      ?? null,
-                'performance_concern'    => ($data['edu_performance_concern']  ?? null) === 'yes',
-                'performance_notes'      => $data['edu_performance_notes']     ?? null,
-                'employment_status'      => $employmentStatus,
-                'occupation_type'        => $data['edu_occupation_type']       ?? null,
-                'education_notes'        => $data['edu_education_notes']       ?? null,
+                'education_level'        => $data['edu_education_level']         ?? null,
+                'school_type'            => $data['edu_school_type']             ?? null,
+                'school_name'            => $data['edu_school_name']             ?? null,
+                'grade_level'            => $data['edu_grade_level']             ?? null,
+                'currently_enrolled'     => ($data['edu_currently_enrolled']     ?? null) === 'yes',
+                'attendance_challenges'  => ($data['edu_attendance_challenges']  ?? null) === 'yes',
+                'attendance_notes'       => $data['edu_attendance_notes']        ?? null,
+                'performance_concern'    => ($data['edu_performance_concern']    ?? null) === 'yes',
+                'performance_notes'      => $data['edu_performance_notes']       ?? null,
+                'employment_status'      => $data['edu_employment_status']       ?? null,
+                'employment_status_other'=> $data['edu_employment_status_other'] ?? null,
+                'occupation_type'        => $data['edu_occupation_type']         ?? null,
+                'education_notes'        => $data['edu_education_notes']         ?? null,
             ]
         );
     }
@@ -921,6 +940,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
         $sr['primary_service_id'] = $data['i_primary_service_id'] ?? null;
         $sr['service_categories'] = $data['i_service_categories'] ?? [];
         $sr['service_ids']        = $data['services_selected']    ?? [];
+        $sr['handover_note']      = $data['handover_note']        ?? null;
         $this->intake->update([
             'services_required' => $sr,
             'priority_level'    => (int) ($data['priority_level'] ?? 3),

@@ -7,7 +7,6 @@ use App\Models\Client;
 use App\Models\User;
 use App\Models\Visit;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -25,7 +24,6 @@ use Tests\TestCase;
  */
 class VisitWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
 
     private Branch $branch;
     private User $receptionist;

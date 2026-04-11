@@ -8,6 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // 0. clients — columns in model $fillable that were never added to migrations
+        Schema::table('clients', function (Blueprint $table) {
+            if (!Schema::hasColumn('clients', 'registration_date')) {
+                $table->date('registration_date')->nullable()->after('uci');
+            }
+            if (!Schema::hasColumn('clients', 'registration_source')) {
+                $table->string('registration_source', 100)->nullable()->after('registration_date');
+            }
+            if (!Schema::hasColumn('clients', 'photo')) {
+                $table->string('photo', 255)->nullable()->comment('Profile photo path (alias)');
+            }
+        });
+
         // 1. visits — reception notes
         if (!Schema::hasColumn('visits', 'reception_notes')) {
             Schema::table('visits', function (Blueprint $table) {
