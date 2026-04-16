@@ -2262,6 +2262,29 @@ class IntakeAssessmentResource extends Resource
             ?? ($client?->date_of_birth ? \Carbon\Carbon::parse($client->date_of_birth)->age : null);
         $ncpwdEligible = $clientAge === null || $clientAge <= 17;
 
+        // Build options — NCPWD disabled when client is over 17
+        $options = [
+            'sha'               => 'SHA — Social Health Authority',
+            'ncpwd'             => $ncpwdEligible
+                ? 'NCPWD — Disability Subsidy'
+                : 'NCPWD — Disability Subsidy (not eligible: client over 17)',
+            'ecitizen'          => 'eCitizen — M-PESA / Online Payment',
+            'insurance_private' => 'Private / Employer Insurance',
+            'waiver'            => 'Waiver — Fee Exemption',
+            'mixed'             => 'Hybrid — Multiple Methods',
+        ];
+
+        $descriptions = [
+            'sha'               => 'Covered by SHA enrolment — card or number verified at billing admin',
+            'ncpwd'             => $ncpwdEligible
+                ? 'NCPWD disability subsidy — for clients aged 17 and below only; card sighted at billing'
+                : '⛔ Not applicable — NCPWD subsidy is restricted to clients aged 17 and below',
+            'ecitizen'          => 'Government eCitizen portal — M-PESA integration coming; client pays at cashier via eCitizen reference',
+            'insurance_private' => 'Billed to private or employer insurance — policy number and card required at billing',
+            'waiver'            => 'Full or partial fee exemption — must be authorised by billing admin before service',
+            'mixed'             => 'Combination of SHA, NCPWD, insurance and/or eCitizen — Payment Admin will split at billing',
+        ];
+
         return [
             // ── Enrolled schemes ──────────────────────────────────────────────────
             Forms\Components\Placeholder::make('j_scheme_header')
@@ -2279,7 +2302,12 @@ class IntakeAssessmentResource extends Resource
 
             Forms\Components\Toggle::make('ncpwd_covered')
                 ->label('NCPWD Cover Applicable')
-                ->helperText($hasNcpwd ? '✓ NCPWD number detected on record' : 'National Council for Persons with Disabilities')
+                ->helperText(
+                    !$ncpwdEligible
+                        ? '⛔ Client is over 17 — NCPWD not applicable'
+                        : ($hasNcpwd ? '✓ NCPWD number detected on record' : 'National Council for Persons with Disabilities')
+                )
+                ->disabled(!$ncpwdEligible)
                 ->live(),
 
             Forms\Components\Toggle::make('has_private_insurance')
@@ -2287,89 +2315,132 @@ class IntakeAssessmentResource extends Resource
                 ->helperText('Tick if client holds an active private or employer health plan')
                 ->live(),
 
-            // ── Payment method radio cards ────────────────────────────────────────
+            // ── Interested in registering SHA/NCPWD ───────────────────────────────
+            Forms\Components\Toggle::make('interested_in_sha_ncpwd')
+                ->label('Interested in SHA / NCPWD Registration?')
+                ->helperText('Client does not have SHA/NCPWD yet but wants to register — routed to Billing Admin to assist with enrolment')
+                ->visible(fn (Get $get): bool =>
+                    ! (bool) $get('sha_enrolled')
+                    && ! (bool) $get('ncpwd_covered')
+                    && ! (bool) $get('has_private_insurance')
+                )
+                ->live()
+                ->columnSpanFull(),
+
+            // ── When interested in registration: override Step 2 with a clear notice ─
+            Forms\Components\Placeholder::make('j_interested_notice')
+                ->hiddenLabel()
+                ->content(new HtmlString(
+                    '<div style="padding:12px 16px;background:#eff6ff;border-radius:8px;border-left:4px solid #3b82f6;font-size:13px;color:#1e40af;">'
+                    . '<strong>Routed to Billing Admin — SHA / NCPWD Registration</strong><br>'
+                    . '<span style="font-size:12px;color:#374151;">The Billing Admin will assist this client with SHA or NCPWD enrolment and verify eligibility before service. '
+                    . 'No payment method selection is needed at intake — the Billing Admin will confirm the final method after registration.</span>'
+                    . '</div>'
+                ))
+                ->visible(fn (Get $get): bool =>
+                    ! (bool) $get('sha_enrolled')
+                    && ! (bool) $get('ncpwd_covered')
+                    && ! (bool) $get('has_private_insurance')
+                    && (bool) $get('interested_in_sha_ncpwd')
+                )
+                ->columnSpanFull(),
+
+            // ── Payment method radio cards (hidden when interested in registration) ─
             Forms\Components\Placeholder::make('j_method_header')
                 ->hiddenLabel()
                 ->content(new HtmlString(
                     '<p style="font-size:13px;font-weight:600;color:#374151;margin:8px 0 4px;">Step 2 — Primary Payment Method</p>'
-                    . '<p style="font-size:12px;color:#64748b;margin:0;">Select the method the client will use at billing. M-PESA can always override at the cashier window.</p>'
+                    . '<p style="font-size:12px;color:#64748b;margin:0;">Select the method the client will use at billing. '
+                    . '<strong>M-PESA is always available and can override any method at the cashier window.</strong></p>'
                 ))
+                ->visible(fn (Get $get): bool =>
+                    ! ((bool) $get('interested_in_sha_ncpwd')
+                        && ! (bool) $get('sha_enrolled')
+                        && ! (bool) $get('ncpwd_covered')
+                        && ! (bool) $get('has_private_insurance'))
+                )
                 ->columnSpanFull(),
 
             Forms\Components\Radio::make('expected_payment_method')
                 ->label('Primary Payment Method')
                 ->hiddenLabel()
-                ->options([
-                    'sha'       => 'SHA — Social Health Authority',
-                    'ncpwd'     => 'NCPWD — Disability Subsidy',
-                    'insurance' => 'Private / Employer Insurance',
-                    'mpesa'     => 'M-PESA (Mobile Money)',
-                    'cash'      => 'Cash (Counter Payment)',
-                    'ecitizen'  => 'eCitizen Portal',
-                    'mixed'     => 'Hybrid / Multiple Methods',
-                ])
-                ->descriptions([
-                    'sha'       => 'Covered by SHA enrolment — verify card or number at billing',
-                    'ncpwd'     => 'Subsidised via NCPWD disability card — for clients aged ≤17 years only',
-                    'insurance' => 'Billed to private or employer insurance — provide policy details',
-                    'mpesa'     => 'Client pays via M-PESA at cashier — no eligibility documents needed',
-                    'cash'      => 'Client pays cash at the cashier window',
-                    'ecitizen'  => 'Government eCitizen portal payment — confirm reference at cashier',
-                    'mixed'     => 'Combination of SHA, NCPWD, insurance and/or out-of-pocket',
-                ])
+                ->options($options)
+                ->descriptions($descriptions)
+                ->disableOptionWhen(fn(string $value): bool => $value === 'ncpwd' && !$ncpwdEligible)
                 ->live()
-                ->required()
+                ->required(fn (Get $get): bool =>
+                    ! ((bool) $get('interested_in_sha_ncpwd')
+                        && ! (bool) $get('sha_enrolled')
+                        && ! (bool) $get('ncpwd_covered')
+                        && ! (bool) $get('has_private_insurance'))
+                )
+                ->visible(fn (Get $get): bool =>
+                    ! ((bool) $get('interested_in_sha_ncpwd')
+                        && ! (bool) $get('sha_enrolled')
+                        && ! (bool) $get('ncpwd_covered')
+                        && ! (bool) $get('has_private_insurance'))
+                )
                 ->columnSpanFull(),
 
-            // ── NCPWD age ineligibility warning ──────────────────────────────────
-            Forms\Components\Placeholder::make('j_ncpwd_age_warning')
+            // ── eCitizen / M-PESA notice ──────────────────────────────────────────
+            Forms\Components\Placeholder::make('j_ecitizen_notice')
                 ->hiddenLabel()
-                ->content(function (Get $get) use ($clientAge): HtmlString {
-                    if ($get('expected_payment_method') !== 'ncpwd' || $clientAge === null || $clientAge <= 17) {
-                        return new HtmlString('');
-                    }
-                    return new HtmlString(
-                        '<div style="padding:12px 16px;background:#fef2f2;border-radius:8px;border:1px solid #fca5a5;color:#991b1b;">'
-                        . '<strong style="font-size:13px;">⛔ NCPWD Not Applicable for This Client</strong><br>'
-                        . '<span style="font-size:12px;line-height:1.6;">'
-                        . "NCPWD subsidy is a government scheme restricted to clients aged <strong>17 years and below</strong>. "
-                        . "This client is <strong>{$clientAge} years old</strong> and is therefore ineligible. "
-                        . 'Please select a different payment method (SHA, Private Insurance, Cash, or M-PESA).'
-                        . '</span>'
-                        . '</div>'
-                    );
-                })
-                ->visible(fn(Get $get) => $get('expected_payment_method') === 'ncpwd' && !$ncpwdEligible)
+                ->content(new HtmlString(
+                    '<div style="padding:8px 14px;background:#f0fdf4;border-radius:6px;border-left:4px solid #16a34a;font-size:12px;color:#14532d;">'
+                    . '<strong>eCitizen / M-PESA:</strong> The government collects M-PESA payments through the eCitizen portal. '
+                    . 'Direct M-PESA integration is coming — for now the cashier confirms the eCitizen reference manually. '
+                    . 'eCitizen payment can also be used as an override at the cashier window for any other method.'
+                    . '</div>'
+                ))
+                ->visible(fn (Get $get): bool =>
+                    $get('expected_payment_method') === 'ecitizen'
+                    && ! ((bool) $get('interested_in_sha_ncpwd')
+                        && ! (bool) $get('sha_enrolled')
+                        && ! (bool) $get('ncpwd_covered')
+                        && ! (bool) $get('has_private_insurance'))
+                )
                 ->columnSpanFull(),
 
-            // ── Eligibility status ────────────────────────────────────────────────
+            // ── Eligibility / routing status ──────────────────────────────────────
             Forms\Components\Placeholder::make('j_eligibility_status')
-                ->label('Eligibility Status')
-                ->content(function (Get $get): HtmlString {
-                    $method = $get('expected_payment_method');
-                    $sha    = (bool) $get('sha_enrolled');
-                    $ncpwd  = (bool) $get('ncpwd_covered');
-                    $insure = (bool) $get('has_private_insurance');
+                ->label('Routing')
+                ->content(function (Get $get) use ($ncpwdEligible): HtmlString {
+                    $sha        = (bool) $get('sha_enrolled');
+                    $ncpwd      = (bool) $get('ncpwd_covered');
+                    $insure     = (bool) $get('has_private_insurance');
+                    $interested = (bool) $get('interested_in_sha_ncpwd');
+                    $method     = $get('expected_payment_method');
+
+                    // Interested path: no enrollments, wants to register
+                    if ($interested && ! $sha && ! $ncpwd && ! $insure) {
+                        return new HtmlString(
+                            "<div style='padding:10px 14px;background:#eff6ff;border-radius:8px;display:flex;align-items:flex-start;gap:10px;'>"
+                            . "<span style='font-weight:700;color:#1d4ed8;font-size:12px;white-space:nowrap;'>→ Billing Admin</span>"
+                            . "<span style='font-size:12px;color:#475569;line-height:1.5;'>Client interested in SHA/NCPWD — Billing Admin will assist with enrolment and confirm payment method.</span>"
+                            . "</div>"
+                        );
+                    }
 
                     [$badge, $bg, $text, $note] = match ($method) {
-                        'sha'       => $sha
-                            ? ['✓ Eligible',  '#dcfce7', '#15803d', 'SHA enrolment confirmed — ready for billing.']
-                            : ['⚠ Unconfirmed','#fef9c3', '#92400e', 'SHA enrolment not confirmed — verify card or number before billing.'],
-                        'ncpwd'     => $ncpwd
-                            ? ['✓ Eligible',  '#dcfce7', '#15803d', 'NCPWD cover noted — card must be sighted by the billing clerk.']
-                            : ['⚠ Unconfirmed','#fef9c3', '#92400e', 'NCPWD cover not confirmed — verify card at billing.'],
-                        'insurance' => $insure
-                            ? ['✓ Eligible',  '#dcfce7', '#15803d', 'Private insurance noted — provide policy number and card to billing.']
-                            : ['⚠ Unconfirmed','#fef9c3', '#92400e', 'Private insurance not confirmed — tick the toggle above if applicable.'],
-                        'mpesa'     => ['✓ Ready',    '#f0fdf4', '#15803d', 'M-PESA payment — client pays at cashier using their mobile number.'],
-                        'cash'      => ['✓ Ready',    '#f0fdf4', '#15803d', 'Cash payment — no eligibility documents required.'],
-                        'ecitizen'  => ['✓ Ready',    '#f0fdf4', '#15803d', 'eCitizen payment — confirm transaction reference at cashier.'],
-                        'mixed'     => ['ℹ Review',   '#eff6ff', '#1d4ed8', 'Hybrid pathway — Payment Admin will verify each component at billing.'],
-                        default     => ['— Pending',  '#f8fafc', '#94a3b8', 'Select a payment method above to see eligibility guidance.'],
+                        'sha'               => $sha
+                            ? ['→ Billing Admin', '#dcfce7', '#15803d', 'SHA enrolment confirmed — Billing Admin verifies and processes coverage.']
+                            : ['→ Billing Admin ⚠', '#fef9c3', '#92400e', 'SHA selected but enrolment not confirmed — Billing Admin will verify. Tick SHA Enrolled above if the card has been sighted.'],
+                        'ncpwd'             => ! $ncpwdEligible
+                            ? ['⛔ Ineligible', '#fef2f2', '#991b1b', 'NCPWD is restricted to clients aged 17 and below. Select a different method.']
+                            : ($ncpwd
+                                ? ['→ Billing Admin', '#dcfce7', '#15803d', 'NCPWD cover noted — Billing Admin sights card and processes subsidy.']
+                                : ['→ Billing Admin ⚠', '#fef9c3', '#92400e', 'NCPWD selected but cover not confirmed — Billing Admin will verify.']),
+                        'ecitizen'          => ['→ Cashier', '#f0fdf4', '#15803d', 'eCitizen / M-PESA — client pays directly at Cashier. No Billing Admin step.'],
+                        'insurance_private' => $insure
+                            ? ['→ Billing Admin', '#dcfce7', '#15803d', 'Private insurance — Billing Admin verifies policy and obtains pre-auth.']
+                            : ['→ Billing Admin ⚠', '#fef9c3', '#92400e', 'Private insurance selected — tick the toggle above to confirm the client holds an active policy.'],
+                        'waiver'            => ['→ Billing Admin', '#eff6ff', '#1d4ed8', 'Waiver — Billing Admin authorises the exemption before service.'],
+                        'mixed'             => ['→ Billing Admin', '#eff6ff', '#1d4ed8', 'Hybrid — Billing Admin sets up the split across methods.'],
+                        default             => ['— Select method', '#f8fafc', '#94a3b8', 'Select a payment method above to see where this client will be routed.'],
                     };
 
                     return new HtmlString(
-                        "<div style='padding:10px 14px;background:{$bg};border-radius:8px;border:1px solid {$bg};display:flex;align-items:flex-start;gap:10px;'>"
+                        "<div style='padding:10px 14px;background:{$bg};border-radius:8px;display:flex;align-items:flex-start;gap:10px;'>"
                         . "<span style='font-weight:700;color:{$text};font-size:12px;white-space:nowrap;'>{$badge}</span>"
                         . "<span style='font-size:12px;color:#475569;line-height:1.5;'>{$note}</span>"
                         . "</div>"
@@ -2382,14 +2453,13 @@ class IntakeAssessmentResource extends Resource
                 ->content(function (Get $get): HtmlString {
                     $method = $get('expected_payment_method');
                     $docs = match ($method) {
-                        'sha'       => ['SHA card or registration number', 'National ID of principal member'],
-                        'ncpwd'     => ['NCPWD card (original or certified copy)', 'National ID or passport'],
-                        'insurance' => ['Insurance card / certificate', 'Policy or member number', 'Pre-authorisation letter (if required by insurer)'],
-                        'mpesa'     => ['National ID or passport', 'Phone with M-PESA access'],
-                        'cash'      => ['No additional documents required'],
-                        'ecitizen'  => ['National ID or Birth Certificate', 'eCitizen account reference or receipt'],
-                        'mixed'     => ['Documents per each pathway — Payment Admin will advise at billing'],
-                        default     => ['Select a payment method above'],
+                        'sha'               => ['SHA card or registration number', 'National ID of principal member'],
+                        'ncpwd'             => ['NCPWD card (original or certified copy)', 'National ID or passport', 'Birth certificate (to confirm age ≤17)'],
+                        'ecitizen'          => ['eCitizen transaction reference or receipt', 'National ID or birth certificate', 'Phone with M-PESA (for cashier-side payment)'],
+                        'insurance_private' => ['Insurance card / certificate', 'Policy or member number', 'Pre-authorisation letter (if required by insurer)'],
+                        'waiver'            => ['Waiver authorisation letter or exemption form', 'National ID or birth certificate'],
+                        'mixed'             => ['Documents per each pathway — Payment Admin will advise at billing'],
+                        default             => ['Select a payment method above'],
                     };
                     $items = implode('', array_map(fn($d) => "<li style='margin:3px 0;color:#374151;'>{$d}</li>", $docs));
                     return new HtmlString(

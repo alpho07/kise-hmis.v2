@@ -35,12 +35,18 @@ class BillingResource extends Resource
     }
 
     /**
-     * Only show invoices that need billing admin attention
+     * Show invoices that need billing admin attention:
+     * - Sponsor/insurance invoices (has_sponsor = true), OR
+     * - Visits currently sitting in the billing stage (includes "interested in SHA/NCPWD" clients)
+     * In both cases only show non-approved statuses.
      */
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('has_sponsor', true)
+            ->where(function (Builder $q) {
+                $q->where('has_sponsor', true)
+                  ->orWhereHas('visit', fn (Builder $vq) => $vq->where('current_stage', 'billing'));
+            })
             ->whereIn('status', ['pending', 'verified', 'approved'])
             ->with(['client', 'visit', 'insuranceProvider', 'items.service']);
     }
@@ -83,10 +89,12 @@ class BillingResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('payment_method')
                             ->options([
-                                'sha' => 'SHA',
-                                'ncpwd' => 'NCPWD',
+                                'sha'               => 'SHA',
+                                'ncpwd'             => 'NCPWD',
                                 'insurance_private' => 'Private Insurance',
-                                'waiver' => 'Waiver',
+                                'waiver'            => 'Waiver',
+                                'ecitizen'          => 'eCitizen (M-PESA)',
+                                'mixed'             => 'Hybrid',
                             ])
                             ->disabled(),
 
@@ -125,19 +133,24 @@ class BillingResource extends Resource
                 Tables\Columns\TextColumn::make('payment_method')
                     ->label('Payment Type')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
-                        'sha' => 'info',
-                        'ncpwd' => 'success',
+                    ->color(fn(?string $state): string => match ($state) {
+                        'sha'               => 'info',
+                        'ncpwd'             => 'success',
                         'insurance_private' => 'warning',
-                        'waiver' => 'danger',
-                        default => 'gray',
+                        'waiver'            => 'danger',
+                        'ecitizen'          => 'primary',
+                        'mixed'             => 'gray',
+                        default             => 'gray',
                     })
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'sha' => 'SHA',
-                        'ncpwd' => 'NCPWD',
+                    ->formatStateUsing(fn(?string $state): string => match ($state) {
+                        'sha'               => 'SHA',
+                        'ncpwd'             => 'NCPWD',
                         'insurance_private' => 'Insurance',
-                        'waiver' => 'Waiver',
-                        default => strtoupper($state),
+                        'waiver'            => 'Waiver',
+                        'ecitizen'          => 'eCitizen',
+                        'mixed'             => 'Hybrid',
+                        null               => 'N/A',
+                        default            => strtoupper($state),
                     }),
 
                 Tables\Columns\TextColumn::make('insuranceProvider.name')
@@ -191,6 +204,20 @@ class BillingResource extends Resource
                     ->boolean()
                     ->toggleable(),
 
+                Tables\Columns\IconColumn::make('billing_approved')
+                    ->label('Approved')
+                    ->boolean()
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->toggleable(),
+
+                Tables\Columns\IconColumn::make('requires_cashier')
+                    ->label('→ Cashier')
+                    ->boolean()
+                    ->trueColor('warning')
+                    ->falseColor('gray')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime('M d, Y H:i')
@@ -202,10 +229,11 @@ class BillingResource extends Resource
                 Tables\Filters\SelectFilter::make('payment_method')
                     ->label('Payment Type')
                     ->options([
-                        'sha' => 'SHA',
-                        'ncpwd' => 'NCPWD',
+                        'sha'               => 'SHA',
+                        'ncpwd'             => 'NCPWD',
                         'insurance_private' => 'Private Insurance',
-                        'waiver' => 'Waiver',
+                        'waiver'            => 'Waiver',
+                        'mixed'             => 'Hybrid',
                     ]),
 
                 Tables\Filters\SelectFilter::make('status')
@@ -292,92 +320,110 @@ class BillingResource extends Resource
                         ]);
                     }),
 
-                // Approve Invoice (Second step - creates claim and routes to cashier)
+                // Approve Invoice (Second step - creates claim and routes client)
                 Tables\Actions\Action::make('approve')
                     ->label('Approve & Route')
                     ->icon('heroicon-o-check-badge')
                     ->color('success')
                     ->visible(fn(Invoice $record) => $record->status === 'verified')
-                    ->requiresConfirmation()
-                    ->modalHeading('Approve Invoice & Create Insurance Claim')
-                    ->modalDescription(
-                        fn(Invoice $record) =>
-                        "Approve invoice and create insurance claim for {$record->client->full_name}. " .
-                            "Sponsor will cover KES " . number_format($record->total_sponsor_amount, 2) . ". " .
-                            "Client will be routed to cashier for KES " . number_format($record->total_client_amount, 2) . "."
-                    )
-                    ->modalSubmitActionLabel('Approve & Create Claim')
-                    ->form([
-                        Forms\Components\Textarea::make('approval_notes')
-                            ->label('Approval Notes')
-                            ->placeholder('Any special instructions or notes...')
-                            ->rows(2),
-                    ])
+                    ->modalHeading('Approve Invoice & Route Client')
+                    ->modalSubmitActionLabel('Approve & Route')
+                    ->form(function (Invoice $record) {
+                        $clientAmount = (float) ($record->total_client_amount ?? 0);
+                        $sponsorAmount = (float) ($record->total_sponsor_amount ?? 0);
+
+                        return [
+                            Forms\Components\Placeholder::make('billing_summary')
+                                ->label('Billing Summary')
+                                ->content(
+                                    "{$record->client->full_name} — "
+                                    . "Total: KES " . number_format($record->total_amount ?? 0, 2)
+                                    . ($sponsorAmount > 0 ? " | Sponsor: KES " . number_format($sponsorAmount, 2) : '')
+                                    . " | Client: KES " . number_format($clientAmount, 2)
+                                ),
+
+                            Forms\Components\Toggle::make('send_to_cashier')
+                                ->label('Send to Cashier?')
+                                ->helperText('ON → client queues at cashier to pay their balance. OFF → billing admin has fully processed payment; client goes directly to service.')
+                                ->default($clientAmount > 0)
+                                ->live(),
+
+                            Forms\Components\Textarea::make('approval_notes')
+                                ->label('Approval Notes')
+                                ->placeholder('Any special instructions or notes...')
+                                ->rows(2),
+                        ];
+                    })
                     ->action(function (Invoice $record, array $data) {
                         \DB::transaction(function () use ($record, $data) {
-                            // Update invoice status
+                            $sendToCashier = (bool) ($data['send_to_cashier'] ?? false);
+
+                            // Mark invoice approved
                             $record->update([
-                                'status' => 'approved',
-                                'approval_notes' => $data['approval_notes'] ?? null,
-                                'approved_by' => auth()->id(),
-                                'approved_at' => now(),
+                                'status'              => 'approved',
+                                'billing_approved'    => true,
+                                'requires_cashier'    => $sendToCashier,
+                                'approval_notes'      => $data['approval_notes'] ?? null,
+                                'approved_by'         => auth()->id(),
+                                'approved_at'         => now(),
                                 'sponsor_claim_status' => 'approved',
                             ]);
 
                             // Create insurance claim if sponsor amount > 0
-                            if ($record->total_sponsor_amount > 0) {
+                            if (($record->total_sponsor_amount ?? 0) > 0) {
                                 $claimService = new InsuranceClaimService();
                                 $claim = $claimService->createClaimFromInvoice($record);
 
                                 \Log::info('Insurance claim created', [
-                                    'claim_id' => $claim->id,
+                                    'claim_id'     => $claim->id,
                                     'claim_number' => $claim->claim_number,
-                                    'invoice_id' => $record->id,
+                                    'invoice_id'   => $record->id,
                                 ]);
                             }
 
                             // Update service bookings to confirmed
                             $record->visit->serviceBookings()->update([
-                                'status' => 'confirmed',
+                                'status'         => 'confirmed',
                                 'payment_status' => 'pending',
                             ]);
 
-                            // Route to cashier if client owes money
-                            if ($record->total_client_amount > 0) {
+                            if ($sendToCashier) {
+                                // Route to cashier — cashier will process remaining client payment
                                 $record->visit->update([
-                                    'current_stage' => 'cashier',
+                                    'current_stage'            => 'cashier',
                                     'current_stage_started_at' => now(),
                                 ]);
 
-                                $message = "Approved! Client routed to Cashier for KES " .
-                                    number_format($record->total_client_amount, 2);
+                                $message = "Approved! Client routed to Cashier for KES "
+                                    . number_format($record->total_client_amount ?? 0, 2);
                             } else {
-                                // Waiver or 100% covered - go straight to service
+                                // Billing admin fully processed — skip cashier, go to service
                                 $record->update([
-                                    'payment_status' => 'paid',
+                                    'payment_status'       => 'paid',
                                     'client_payment_status' => 'waived',
-                                    'payment_verified_at' => now(),
+                                    'payment_verified_at'  => now(),
                                 ]);
 
                                 $record->visit->update([
-                                    'current_stage' => 'service',
+                                    'current_stage'            => 'service',
                                     'current_stage_started_at' => now(),
-                                    'payment_verified_at' => now(),
+                                    'payment_verified_at'      => now(),
                                 ]);
 
-                                // Create service queue entries since no cashier step needed
                                 $routingService = new PaymentRoutingService();
-                                $queueResult = $routingService->createServiceQueues($record->visit);
+                                $queueResult    = $routingService->createServiceQueues($record->visit);
 
-                                if (!$queueResult['success']) {
-                                    \Log::error('Queue creation failed for 100%-covered invoice', [
+                                if (! $queueResult['success']) {
+                                    \Log::error('Queue creation failed after billing admin approval', [
                                         'invoice_id' => $record->id,
-                                        'error' => $queueResult['error'] ?? 'Unknown error',
+                                        'error'      => $queueResult['error'] ?? 'Unknown error',
                                     ]);
                                 }
 
-                                $message = "Approved! 100% covered — Client routed to Service Point"
-                                    . ($queueResult['success'] ? " ({$queueResult['queues_created']} queue(s) created)" : " (queue creation failed — add manually)");
+                                $message = "Approved! Client routed to Service Point"
+                                    . ($queueResult['success']
+                                        ? " ({$queueResult['queues_created']} queue(s) created)"
+                                        : " (queue creation failed — add manually)");
                             }
 
                             Notification::make()

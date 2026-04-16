@@ -267,10 +267,11 @@ class IntakeAssessmentEditor extends Page implements HasForms
             'expected_payment_method' => $sr['payment_method'] ?? (
                 $shaAutoDetected ? 'sha' : ($ncpwdAutoDetected ? 'ncpwd' : null)
             ),
-            'sha_enrolled'            => array_key_exists('sha_enrolled', $sr) ? (bool) $sr['sha_enrolled'] : $shaAutoDetected,
-            'ncpwd_covered'           => array_key_exists('ncpwd_covered', $sr) ? (bool) $sr['ncpwd_covered'] : $ncpwdAutoDetected,
-            'has_private_insurance'   => (bool) ($sr['has_insurance'] ?? false),
-            'payment_notes'           => $sr['payment_notes'] ?? null,
+            'sha_enrolled'              => array_key_exists('sha_enrolled', $sr) ? (bool) $sr['sha_enrolled'] : $shaAutoDetected,
+            'ncpwd_covered'             => array_key_exists('ncpwd_covered', $sr) ? (bool) $sr['ncpwd_covered'] : $ncpwdAutoDetected,
+            'has_private_insurance'     => (bool) ($sr['has_insurance'] ?? false),
+            'interested_in_sha_ncpwd'   => (bool) ($sr['interested_in_sha_ncpwd'] ?? false),
+            'payment_notes'             => $sr['payment_notes'] ?? null,
         ];
 
         $isDeferred = $visit->status === 'deferred';
@@ -950,12 +951,25 @@ class IntakeAssessmentEditor extends Page implements HasForms
     protected function saveSectionJ(array $data): void
     {
         $sr = $this->intake->services_required ?? [];
-        $sr['payment_method'] = $data['expected_payment_method']   ?? null;
-        $sr['sha_enrolled']   = (bool) ($data['sha_enrolled']      ?? false);
-        $sr['ncpwd_covered']  = (bool) ($data['ncpwd_covered']     ?? false);
-        $sr['has_insurance']  = (bool) ($data['has_private_insurance'] ?? false);
-        $sr['payment_notes']  = $data['payment_notes']             ?? null;
-        $this->intake->update(['services_required' => $sr]);
+        $sr['sha_enrolled']             = (bool) ($data['sha_enrolled']          ?? false);
+        $sr['ncpwd_covered']            = (bool) ($data['ncpwd_covered']          ?? false);
+        $sr['has_insurance']            = (bool) ($data['has_private_insurance']  ?? false);
+        $sr['interested_in_sha_ncpwd']  = (bool) ($data['interested_in_sha_ncpwd'] ?? false);
+        $sr['payment_notes']            = $data['payment_notes']                  ?? null;
+
+        // When interested path: payment method radio is hidden — preserve ecitizen as placeholder
+        // so the column is never null and billing admin can update it after registration.
+        if ($sr['interested_in_sha_ncpwd'] && ! $sr['sha_enrolled'] && ! $sr['ncpwd_covered'] && ! $sr['has_insurance']) {
+            $sr['payment_method'] = 'ecitizen';
+        } else {
+            $sr['payment_method'] = $data['expected_payment_method'] ?? null;
+        }
+
+        $this->intake->update([
+            'services_required'       => $sr,
+            'interested_in_sha_ncpwd' => $sr['interested_in_sha_ncpwd'],
+            'expected_payment_method' => $sr['payment_method'],
+        ]);
     }
 
     protected function saveSectionK(array $data): void
@@ -1120,8 +1134,10 @@ class IntakeAssessmentEditor extends Page implements HasForms
             }
 
             // ── Invoice ──────────────────────────────────────────────────
-            $paymentMethod = $sr['payment_method'] ?? 'cash';
-            $hasSponsor    = in_array($paymentMethod, ['sha', 'ncpwd', 'insurance_private', 'waiver', 'combination'], true);
+            $paymentMethod = $sr['payment_method'] ?? 'ecitizen';
+            // Billing admin handles: SHA, NCPWD, private insurance, waiver, hybrid
+            // Cashier handles directly: eCitizen / M-PESA
+            $hasSponsor    = in_array($paymentMethod, ['sha', 'ncpwd', 'insurance_private', 'waiver', 'mixed'], true);
             $branchCode    = $visit->branch ? strtoupper(substr($visit->branch->name, 0, 3)) : 'HQ';
             $invYear       = now()->format('Y');
             $invMonth      = now()->format('m');
@@ -1137,6 +1153,7 @@ class IntakeAssessmentEditor extends Page implements HasForms
                 'branch_id'       => $visit->branch_id,
                 'invoice_number'  => $invoiceNumber,
                 'payment_pathway' => $paymentMethod,
+                'payment_method'  => $paymentMethod,
                 'status'          => 'pending',
                 'generated_by'    => Auth::id(),
                 'notes'           => $sr['payment_notes'] ?? null,
@@ -1207,10 +1224,17 @@ class IntakeAssessmentEditor extends Page implements HasForms
             ]);
 
             // ── Route visit ───────────────────────────────────────────────
+            // Billing admin handles: SHA, NCPWD, private insurance, waiver, hybrid,
+            // and new clients who want to register for SHA/NCPWD (interested flag).
+            $interestedInScheme = (bool) ($sr['interested_in_sha_ncpwd'] ?? false);
+            $needsBillingAdmin  = $hasSponsor || $interestedInScheme;
+
             $visit->completeStage();
-            if ($hasSponsor) {
+            if ($needsBillingAdmin) {
                 $visit->moveToStage('billing');
-                $routeLabel = 'Payment Admin (' . strtoupper($paymentMethod) . ')';
+                $routeLabel = $hasSponsor
+                    ? 'Payment Admin (' . strtoupper($paymentMethod) . ')'
+                    : 'Payment Admin — SHA/NCPWD Registration';
             } else {
                 $visit->moveToStage('cashier');
                 $routeLabel = 'Cashier — KES ' . number_format($totalClient, 2);

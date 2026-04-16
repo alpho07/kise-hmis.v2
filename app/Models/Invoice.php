@@ -57,6 +57,8 @@ class Invoice extends Model
         'has_sponsor',
         'client_payment_status',
         'sponsor_claim_status',
+        'billing_approved',
+        'requires_cashier',
     ];
 
     protected $casts = [
@@ -71,7 +73,9 @@ class Invoice extends Model
         'total_sponsor_amount' => 'decimal:2',
         'total_client_amount' => 'decimal:2',
         'amount_paid' => 'decimal:2',
-        'has_sponsor' => 'boolean',
+        'has_sponsor'      => 'boolean',
+        'billing_approved' => 'boolean',
+        'requires_cashier' => 'boolean',
     ];
 
     /**

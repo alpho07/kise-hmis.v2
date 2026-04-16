@@ -7,6 +7,7 @@ use App\Models\ClientEducation;
 use App\Models\ClientMedicalHistory;
 use App\Models\ClientSocioDemographic;
 use App\Models\FunctionalScreening;
+use App\Filament\Resources\IntakeAssessmentResource;
 use App\Models\IntakeAssessment;
 use App\Models\Service;
 use Barryvdh\DomPDF\Facade\Pdf;
